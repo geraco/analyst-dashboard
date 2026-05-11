@@ -1,0 +1,999 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>Financial Analyst</title>
+  <script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+  <style>
+    :root {
+      --bg:        #0f1117;
+      --surface:   #1a1d27;
+      --surface2:  #22263a;
+      --border:    #2e3350;
+      --text:      #e2e8f0;
+      --muted:     #7a82a0;
+      --green:     #22c55e;
+      --red:       #ef4444;
+      --yellow:    #eab308;
+      --blue:      #3b82f6;
+      --purple:    #a855f7;
+      --accent:    #3b82f6;
+    }
+
+    * { box-sizing: border-box; margin: 0; padding: 0; }
+
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      font-size: 14px;
+      line-height: 1.5;
+      min-height: 100vh;
+    }
+
+    /* ── Header ── */
+    .header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 12px 16px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+    .header h1 { font-size: 16px; font-weight: 700; letter-spacing: 0.02em; }
+    .header-right { display: flex; align-items: center; gap: 12px; }
+    .updated { font-size: 11px; color: var(--muted); }
+    .refresh-btn {
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 6px;
+      padding: 6px 12px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    .refresh-btn:hover { opacity: 0.85; }
+    .refresh-btn:disabled { opacity: 0.5; cursor: default; }
+
+    /* ── Layout ── */
+    .container { max-width: 1200px; margin: 0 auto; padding: 16px; }
+
+    /* ── Summary Cards ── */
+    .cards {
+      display: grid;
+      grid-template-columns: repeat(2, 1fr);
+      gap: 10px;
+      margin-bottom: 16px;
+    }
+    @media (min-width: 640px) { .cards { grid-template-columns: repeat(4, 1fr); } }
+
+    .card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 14px;
+    }
+    .card-label { font-size: 11px; color: var(--muted); text-transform: uppercase; letter-spacing: 0.05em; margin-bottom: 4px; }
+    .card-value { font-size: 22px; font-weight: 700; line-height: 1.1; }
+    .card-sub { font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .pos { color: var(--green); }
+    .neg { color: var(--red); }
+    .neu { color: var(--text); }
+
+    /* ── Section ── */
+    .section { margin-bottom: 20px; }
+    .section-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      margin-bottom: 10px;
+    }
+    .section-title { font-size: 13px; font-weight: 700; text-transform: uppercase; letter-spacing: 0.05em; color: var(--muted); }
+
+    /* ── Chart Container ── */
+    .chart-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+    }
+    .chart-tabs { display: flex; gap: 6px; margin-bottom: 14px; }
+    .chart-tab {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      color: var(--muted);
+      border-radius: 6px;
+      padding: 4px 10px;
+      font-size: 12px;
+      font-weight: 600;
+      cursor: pointer;
+      transition: all 0.15s;
+    }
+    .chart-tab.active { background: var(--accent); border-color: var(--accent); color: #fff; }
+    .chart-wrap { position: relative; height: 200px; }
+
+    /* ── Table ── */
+    .table-wrap { overflow-x: auto; }
+    table {
+      width: 100%;
+      border-collapse: collapse;
+      background: var(--surface);
+      border-radius: 10px;
+      overflow: hidden;
+      border: 1px solid var(--border);
+    }
+    th {
+      background: var(--surface2);
+      color: var(--muted);
+      font-size: 11px;
+      font-weight: 600;
+      text-transform: uppercase;
+      letter-spacing: 0.04em;
+      padding: 8px 12px;
+      text-align: right;
+      white-space: nowrap;
+    }
+    th:first-child, th.left { text-align: left; }
+    td {
+      padding: 9px 12px;
+      border-top: 1px solid var(--border);
+      text-align: right;
+      white-space: nowrap;
+      font-size: 13px;
+    }
+    td:first-child, td.left { text-align: left; }
+    tr:last-child td { border-bottom: none; }
+
+    .broker-tag {
+      display: inline-block;
+      font-size: 10px;
+      font-weight: 700;
+      padding: 1px 5px;
+      border-radius: 4px;
+      margin-left: 5px;
+      background: var(--surface2);
+      color: var(--muted);
+    }
+
+    /* ── Signal List ── */
+    .signal-list { display: flex; flex-direction: column; gap: 8px; }
+    .signal-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      display: flex;
+      gap: 10px;
+      align-items: flex-start;
+    }
+    .signal-badge {
+      font-size: 10px;
+      font-weight: 700;
+      padding: 3px 7px;
+      border-radius: 5px;
+      text-transform: uppercase;
+      white-space: nowrap;
+      flex-shrink: 0;
+    }
+    .badge-buy    { background: rgba(34,197,94,0.15);  color: var(--green);  border: 1px solid rgba(34,197,94,0.3); }
+    .badge-sell   { background: rgba(239,68,68,0.15);  color: var(--red);    border: 1px solid rgba(239,68,68,0.3); }
+    .badge-watch  { background: rgba(234,179,8,0.15);  color: var(--yellow); border: 1px solid rgba(234,179,8,0.3); }
+    .badge-disc   { background: rgba(168,85,247,0.15); color: var(--purple); border: 1px solid rgba(168,85,247,0.3); }
+
+    .signal-info { flex: 1; min-width: 0; }
+    .signal-ticker { font-weight: 700; font-size: 14px; }
+    .signal-reason { color: var(--muted); font-size: 12px; margin-top: 2px; word-break: break-word; }
+    .signal-meta { font-size: 11px; color: var(--muted); margin-top: 4px; }
+
+    /* ── Discovery ── */
+    .disc-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+      margin-bottom: 8px;
+    }
+    .disc-header { display: flex; align-items: center; gap: 8px; margin-bottom: 6px; }
+    .disc-ticker { font-weight: 700; font-size: 15px; }
+    .disc-score {
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 5px;
+      padding: 2px 7px;
+      font-size: 11px;
+      font-weight: 700;
+      color: var(--purple);
+    }
+    .disc-time { font-size: 11px; color: var(--muted); margin-left: auto; }
+    .disc-signals { display: flex; flex-wrap: wrap; gap: 4px; }
+    .disc-signal-tag {
+      background: rgba(59,130,246,0.1);
+      border: 1px solid rgba(59,130,246,0.25);
+      color: var(--blue);
+      border-radius: 4px;
+      padding: 2px 7px;
+      font-size: 11px;
+    }
+
+    /* ── Watchlist ── */
+    .watchlist-chips { display: flex; flex-wrap: wrap; gap: 6px; }
+    .wl-chip {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      padding: 5px 10px;
+      font-size: 12px;
+      font-weight: 700;
+    }
+    .wl-chip.auto { border-color: rgba(168,85,247,0.4); color: var(--purple); }
+    .wl-chip.manual { border-color: rgba(59,130,246,0.4); color: var(--blue); }
+
+    /* ── Outcomes ── */
+    .outcomes-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fill, minmax(160px, 1fr));
+      gap: 8px;
+    }
+    .outcome-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      padding: 12px;
+    }
+    .outcome-type { font-size: 12px; font-weight: 700; margin-bottom: 6px; text-transform: uppercase; }
+    .outcome-stat { display: flex; justify-content: space-between; font-size: 12px; color: var(--muted); margin-top: 2px; }
+    .outcome-stat span:last-child { color: var(--text); font-weight: 600; }
+
+    /* ── Daily P&L Bar ── */
+    .pnl-card {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 10px;
+      padding: 16px;
+    }
+    .pnl-wrap { position: relative; height: 140px; }
+
+    /* ── Empty State ── */
+    .empty { text-align: center; color: var(--muted); padding: 24px; font-size: 13px; }
+
+    /* ── Password Gate ── */
+    .password-gate {
+      position: fixed;
+      inset: 0;
+      background: var(--bg);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      z-index: 1000;
+    }
+    .pw-box {
+      background: var(--surface);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 32px 28px;
+      width: 320px;
+      text-align: center;
+    }
+    .pw-box h2 { font-size: 20px; margin-bottom: 6px; }
+    .pw-box p  { color: var(--muted); font-size: 13px; margin-bottom: 20px; }
+    .pw-input {
+      width: 100%;
+      background: var(--surface2);
+      border: 1px solid var(--border);
+      border-radius: 8px;
+      color: var(--text);
+      font-size: 16px;
+      padding: 10px 14px;
+      margin-bottom: 12px;
+      outline: none;
+    }
+    .pw-input:focus { border-color: var(--accent); }
+    .pw-btn {
+      width: 100%;
+      background: var(--accent);
+      color: #fff;
+      border: none;
+      border-radius: 8px;
+      padding: 10px;
+      font-size: 15px;
+      font-weight: 700;
+      cursor: pointer;
+      transition: opacity 0.15s;
+    }
+    .pw-btn:hover { opacity: 0.85; }
+    .pw-btn:disabled { opacity: 0.5; cursor: default; }
+    .pw-error {
+      color: var(--red);
+      font-size: 12px;
+      margin-top: 10px;
+      display: none;
+    }
+
+    /* ── Error Banner ── */
+    .error-banner {
+      background: rgba(239,68,68,0.1);
+      border: 1px solid rgba(239,68,68,0.3);
+      color: var(--red);
+      border-radius: 8px;
+      padding: 12px 16px;
+      margin-bottom: 16px;
+      font-size: 13px;
+      display: none;
+    }
+  </style>
+</head>
+<body>
+
+<!-- Password Gate (hidden when unlocked) -->
+<div class="password-gate" id="password-gate" style="display:none">
+  <div class="pw-box">
+    <div style="font-size:36px;margin-bottom:8px">🔒</div>
+    <h2>Financial Analyst</h2>
+    <p>Enter your dashboard password</p>
+    <input class="pw-input" id="pw-input" type="password" placeholder="Password" autocomplete="current-password" />
+    <button class="pw-btn" id="pw-btn" onclick="submitPassword()">Unlock</button>
+    <div class="pw-error" id="pw-error"></div>
+  </div>
+</div>
+
+<div id="dashboard-content">
+
+<div class="header">
+  <h1>📊 Financial Analyst</h1>
+  <div class="header-right">
+    <span class="updated" id="updated-at">Loading…</span>
+    <button class="refresh-btn" id="refresh-btn" onclick="loadData(true)">↻ Refresh</button>
+  </div>
+</div>
+
+<div class="container">
+
+  <div class="error-banner" id="error-banner">
+    Could not load dashboard data. Make sure the analyst has run at least once.
+  </div>
+
+  <!-- Summary Cards -->
+  <div class="cards">
+    <div class="card">
+      <div class="card-label">Net Worth</div>
+      <div class="card-value" id="net-worth">—</div>
+      <div class="card-sub" id="nw-sub"></div>
+    </div>
+    <div class="card">
+      <div class="card-label">Today's P&amp;L</div>
+      <div class="card-value" id="daily-pnl">—</div>
+      <div class="card-sub" id="daily-pnl-sub"></div>
+    </div>
+    <div class="card">
+      <div class="card-label">Portfolio Value</div>
+      <div class="card-value" id="portfolio-value">—</div>
+      <div class="card-sub" id="pv-sub"></div>
+    </div>
+    <div class="card">
+      <div class="card-label">Investable Cash</div>
+      <div class="card-value" id="investable-cash">—</div>
+      <div class="card-sub" id="ic-sub"></div>
+    </div>
+  </div>
+
+  <!-- Net Worth Chart -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-title">Net Worth History</span>
+      <div class="chart-tabs">
+        <button class="chart-tab" onclick="setHistoryRange(7)" data-range="7">7D</button>
+        <button class="chart-tab active" onclick="setHistoryRange(30)" data-range="30">30D</button>
+        <button class="chart-tab" onclick="setHistoryRange(90)" data-range="90">90D</button>
+      </div>
+    </div>
+    <div class="chart-card">
+      <div class="chart-wrap"><canvas id="history-chart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Daily P&L -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-title">Daily P&amp;L — Last 30 Days</span>
+    </div>
+    <div class="pnl-card">
+      <div class="pnl-wrap"><canvas id="pnl-chart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Holdings -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-title">Holdings</span>
+    </div>
+    <div class="table-wrap">
+      <table id="holdings-table">
+        <thead>
+          <tr>
+            <th class="left">Ticker</th>
+            <th>Price (native)</th>
+            <th>Value (€)</th>
+            <th>Cost/share</th>
+            <th>P&amp;L (€)</th>
+            <th>vs Baseline</th>
+          </tr>
+        </thead>
+        <tbody id="holdings-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Crypto -->
+  <div class="section" id="crypto-section" style="display:none">
+    <div class="section-header">
+      <span class="section-title">Crypto</span>
+    </div>
+    <div class="table-wrap">
+      <table id="crypto-table">
+        <thead>
+          <tr>
+            <th class="left">Coin</th>
+            <th>Amount</th>
+            <th>Price (€)</th>
+            <th>Value (€)</th>
+          </tr>
+        </thead>
+        <tbody id="crypto-body"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Recent Signals -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-title">Recent Signals — Last 7 Days</span>
+    </div>
+    <div class="signal-list" id="signals-list">
+      <div class="empty">Loading…</div>
+    </div>
+  </div>
+
+  <!-- Discovery -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-title">New Opportunities — Last 7 Days</span>
+    </div>
+    <div id="discovery-list">
+      <div class="empty">Loading…</div>
+    </div>
+  </div>
+
+  <!-- Watchlists -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-title">Watchlist</span>
+    </div>
+    <div class="watchlist-chips" id="watchlist-chips">
+      <div class="empty">Loading…</div>
+    </div>
+  </div>
+
+  <!-- Signal Performance -->
+  <div class="section">
+    <div class="section-header">
+      <span class="section-title">Signal Performance</span>
+    </div>
+    <div class="outcomes-grid" id="outcomes-grid">
+      <div class="empty">Loading…</div>
+    </div>
+  </div>
+
+</div><!-- /container -->
+
+<script>
+// ── State ──────────────────────────────────────────────────────────────────
+let DATA = null;
+let historyChart = null;
+let pnlChart = null;
+let historyRange = 30;
+
+// ── Helpers ────────────────────────────────────────────────────────────────
+const eur = (v) => {
+  if (v == null || isNaN(v)) return '—';
+  return '€' + Math.abs(v).toLocaleString('en-IE', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+};
+const pct = (v) => {
+  if (v == null || isNaN(v)) return '';
+  const sign = v >= 0 ? '+' : '';
+  return sign + v.toFixed(2) + '%';
+};
+const sign = (v) => v == null ? 'neu' : v > 0 ? 'pos' : v < 0 ? 'neg' : 'neu';
+const signStr = (v) => v == null ? '' : v >= 0 ? '+' : '';
+const fmt = (v, dp=2) => v == null ? '—' : (v >= 0 ? '+' : '') + v.toFixed(dp);
+
+function colorVal(el, v) {
+  el.classList.remove('pos','neg','neu');
+  el.classList.add(sign(v));
+}
+
+// ── Crypto helpers (Web Crypto API) ───────────────────────────────────────
+function b64ToBytes(b64) {
+  return Uint8Array.from(atob(b64), c => c.charCodeAt(0));
+}
+
+async function decryptData(enc, password) {
+  const keyMaterial = await crypto.subtle.importKey(
+    "raw", new TextEncoder().encode(password), "PBKDF2", false, ["deriveKey"]
+  );
+  const key = await crypto.subtle.deriveKey(
+    { name: "PBKDF2", salt: b64ToBytes(enc.salt), iterations: 100000, hash: "SHA-256" },
+    keyMaterial,
+    { name: "AES-GCM", length: 256 },
+    false, ["decrypt"]
+  );
+  const plain = await crypto.subtle.decrypt(
+    { name: "AES-GCM", iv: b64ToBytes(enc.iv) },
+    key, b64ToBytes(enc.data)
+  );
+  return JSON.parse(new TextDecoder().decode(plain));
+}
+
+// ── Password Gate ──────────────────────────────────────────────────────────
+const SESSION_KEY = 'analyst_pw';
+
+function showPasswordGate(errorMsg = '') {
+  document.getElementById('password-gate').style.display = 'flex';
+  document.getElementById('dashboard-content').style.display = 'none';
+  if (errorMsg) {
+    document.getElementById('pw-error').textContent = errorMsg;
+    document.getElementById('pw-error').style.display = 'block';
+  }
+  setTimeout(() => document.getElementById('pw-input').focus(), 50);
+}
+
+function hidPasswordGate() {
+  document.getElementById('password-gate').style.display = 'none';
+  document.getElementById('dashboard-content').style.display = 'block';
+}
+
+async function submitPassword() {
+  const pw = document.getElementById('pw-input').value;
+  if (!pw) return;
+  const btn = document.getElementById('pw-btn');
+  btn.disabled = true;
+  btn.textContent = 'Unlocking…';
+  try {
+    const r = await fetch('data.enc?t=' + Date.now());
+    if (!r.ok) throw new Error('HTTP ' + r.status);
+    const enc = await r.json();
+    DATA = await decryptData(enc, pw);
+    sessionStorage.setItem(SESSION_KEY, pw);
+    hidPasswordGate();
+    render();
+  } catch(e) {
+    showPasswordGate('Wrong password — try again');
+  }
+  btn.disabled = false;
+  btn.textContent = 'Unlock';
+}
+
+// ── Data Loading ───────────────────────────────────────────────────────────
+async function loadData(force = false) {
+  const btn = document.getElementById('refresh-btn');
+  btn.disabled = true;
+  btn.textContent = '↻ Loading…';
+
+  // Determine whether we're using encrypted (data.enc) or plain (data.json)
+  const encUrl  = 'data.enc?probe=1';
+  const plainUrl = 'data.json' + (force ? '?t=' + Date.now() : '');
+
+  try {
+    // Check if encrypted version exists
+    const probe = await fetch('data.enc', { method: 'HEAD' });
+
+    if (probe.ok) {
+      // Encrypted mode — need a password
+      const savedPw = sessionStorage.getItem(SESSION_KEY);
+      if (savedPw && !force) {
+        // Try cached password first
+        try {
+          const r = await fetch('data.enc?t=' + Date.now());
+          const enc = await r.json();
+          DATA = await decryptData(enc, savedPw);
+          hidPasswordGate();
+          document.getElementById('error-banner').style.display = 'none';
+          render();
+          btn.disabled = false;
+          btn.textContent = '↻ Refresh';
+          return;
+        } catch(e) {
+          // Cached password no longer valid — clear and show gate
+          sessionStorage.removeItem(SESSION_KEY);
+        }
+      }
+      // Show password gate
+      showPasswordGate();
+    } else {
+      // Plain mode (local use / no password set)
+      const r = await fetch(plainUrl);
+      if (!r.ok) throw new Error('HTTP ' + r.status);
+      DATA = await r.json();
+      document.getElementById('error-banner').style.display = 'none';
+      hidPasswordGate();
+      render();
+    }
+  } catch(e) {
+    document.getElementById('error-banner').style.display = 'block';
+    console.error('Failed to load dashboard data:', e);
+  }
+  btn.disabled = false;
+  btn.textContent = '↻ Refresh';
+}
+
+// Allow Enter key on password input
+document.addEventListener('DOMContentLoaded', () => {
+  const input = document.getElementById('pw-input');
+  if (input) input.addEventListener('keydown', e => { if (e.key === 'Enter') submitPassword(); });
+});
+
+// ── Render ─────────────────────────────────────────────────────────────────
+function render() {
+  if (!DATA) return;
+  document.getElementById('updated-at').textContent = 'Updated ' + (DATA.generated_at || '?');
+  renderCards();
+  renderHistory();
+  renderPnl();
+  renderHoldings();
+  renderCrypto();
+  renderSignals();
+  renderDiscovery();
+  renderWatchlist();
+  renderOutcomes();
+}
+
+// ── Cards ──────────────────────────────────────────────────────────────────
+function renderCards() {
+  const p = DATA.portfolio || {};
+  const pnlArr = DATA.daily_pnl || [];
+  const today = pnlArr.length ? pnlArr[pnlArr.length - 1] : null;
+
+  // Net worth
+  const nwEl = document.getElementById('net-worth');
+  nwEl.textContent = eur(p.net_worth);
+  colorVal(nwEl, p.total_pnl);
+
+  const nwSub = document.getElementById('nw-sub');
+  const cryptoVal = p.crypto_value || 0;
+  const cryptoPart = cryptoVal > 0 ? ` · crypto ${eur(cryptoVal)}` : '';
+  nwSub.innerHTML = `stocks ${eur(p.total_value)}${cryptoPart}`;
+
+  // Daily P&L
+  const dpEl = document.getElementById('daily-pnl');
+  const dpSub = document.getElementById('daily-pnl-sub');
+  if (today) {
+    dpEl.textContent = (today.change >= 0 ? '+' : '') + eur(today.change);
+    colorVal(dpEl, today.change);
+    dpSub.innerHTML = `<span class="${sign(today.change_pct)}">${pct(today.change_pct)}</span> vs yesterday`;
+  } else {
+    dpEl.textContent = '—';
+    dpSub.textContent = 'No data yet';
+  }
+
+  // Portfolio value
+  const pvEl = document.getElementById('portfolio-value');
+  pvEl.textContent = eur(p.total_value);
+
+  const pvSub = document.getElementById('pv-sub');
+  pvSub.innerHTML = `<span class="${sign(p.pnl_pct)}">${pct(p.pnl_pct)}</span> total return`;
+
+  // Cash
+  const icEl = document.getElementById('investable-cash');
+  icEl.textContent = eur(p.investable_cash);
+  colorVal(icEl, p.investable_cash);
+
+  const icSub = document.getElementById('ic-sub');
+  icSub.textContent = eur(p.cash) + ' total savings';
+}
+
+// ── History Chart ──────────────────────────────────────────────────────────
+function setHistoryRange(days) {
+  historyRange = days;
+  document.querySelectorAll('.chart-tab').forEach(t => {
+    t.classList.toggle('active', parseInt(t.dataset.range) === days);
+  });
+  renderHistory();
+}
+
+function renderHistory() {
+  const all = DATA.history || [];
+  const slice = all.slice(-historyRange);
+
+  const labels = slice.map(d => d.date);
+  const values = slice.map(d => d.net_worth);
+
+  const ctx = document.getElementById('history-chart').getContext('2d');
+
+  if (historyChart) historyChart.destroy();
+
+  const grad = ctx.createLinearGradient(0, 0, 0, 200);
+  grad.addColorStop(0, 'rgba(59,130,246,0.25)');
+  grad.addColorStop(1, 'rgba(59,130,246,0.0)');
+
+  historyChart = new Chart(ctx, {
+    type: 'line',
+    data: {
+      labels,
+      datasets: [{
+        data: values,
+        borderColor: '#3b82f6',
+        backgroundColor: grad,
+        borderWidth: 2,
+        pointRadius: slice.length > 20 ? 0 : 3,
+        pointHoverRadius: 5,
+        fill: true,
+        tension: 0.3,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      interaction: { mode: 'index', intersect: false },
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => '  Net Worth: ' + eur(ctx.parsed.y),
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: { color: 'rgba(255,255,255,0.04)' },
+          ticks: {
+            color: '#7a82a0',
+            font: { size: 10 },
+            maxTicksLimit: 8,
+            maxRotation: 0,
+          }
+        },
+        y: {
+          grid: { color: 'rgba(255,255,255,0.04)' },
+          ticks: {
+            color: '#7a82a0',
+            font: { size: 10 },
+            callback: v => '€' + (v/1000).toFixed(0) + 'k',
+          }
+        }
+      }
+    }
+  });
+}
+
+// ── Daily P&L Chart ────────────────────────────────────────────────────────
+function renderPnl() {
+  const all = DATA.daily_pnl || [];
+  const labels = all.map(d => d.date);
+  const values = all.map(d => d.change);
+  const colors = values.map(v => v >= 0 ? 'rgba(34,197,94,0.75)' : 'rgba(239,68,68,0.75)');
+  const borders = values.map(v => v >= 0 ? '#22c55e' : '#ef4444');
+
+  const ctx = document.getElementById('pnl-chart').getContext('2d');
+  if (pnlChart) pnlChart.destroy();
+
+  pnlChart = new Chart(ctx, {
+    type: 'bar',
+    data: {
+      labels,
+      datasets: [{
+        data: values,
+        backgroundColor: colors,
+        borderColor: borders,
+        borderWidth: 1,
+        borderRadius: 2,
+      }]
+    },
+    options: {
+      responsive: true,
+      maintainAspectRatio: false,
+      plugins: {
+        legend: { display: false },
+        tooltip: {
+          callbacks: {
+            label: ctx => '  ' + (ctx.parsed.y >= 0 ? '+' : '') + eur(ctx.parsed.y),
+          }
+        }
+      },
+      scales: {
+        x: {
+          grid: { display: false },
+          ticks: { color: '#7a82a0', font: { size: 10 }, maxTicksLimit: 10, maxRotation: 0 }
+        },
+        y: {
+          grid: { color: 'rgba(255,255,255,0.04)' },
+          ticks: {
+            color: '#7a82a0',
+            font: { size: 10 },
+            callback: v => (v >= 0 ? '+' : '') + '€' + v.toFixed(0),
+          }
+        }
+      }
+    }
+  });
+}
+
+// ── Holdings Table ─────────────────────────────────────────────────────────
+// Map currency code → display symbol
+const CURRENCY_SYM = { USD: '$', GBP: '£', EUR: '€' };
+
+function renderHoldings() {
+  const holdings = (DATA.portfolio || {}).holdings || [];
+  const tbody = document.getElementById('holdings-body');
+
+  if (!holdings.length) {
+    tbody.innerHTML = '<tr><td colspan="6" class="empty">No holdings found</td></tr>';
+    return;
+  }
+
+  tbody.innerHTML = holdings.map(h => {
+    const pnlSign  = h.pnl >= 0 ? '+' : '';
+    const baseSign = h.baseline_pnl_pct >= 0 ? '+' : '';
+    // Native currency symbol for per-share price ($ £ €)
+    const sym = CURRENCY_SYM[h.currency] || '$';
+    // Cost basis shown in native currency per share
+    const cbNative = h.cost_basis.toLocaleString('en-IE', {minimumFractionDigits:2, maximumFractionDigits:4});
+
+    return `<tr>
+      <td class="left">
+        <strong>${h.ticker}</strong>
+        <span class="broker-tag">${h.broker || ''}</span>
+        <br><span style="font-size:11px;color:var(--muted)">${h.shares} shares · ${h.currency}</span>
+      </td>
+      <td>${sym}${h.current_price.toLocaleString('en-IE', {minimumFractionDigits:2,maximumFractionDigits:4})}</td>
+      <td>€${h.market_value.toLocaleString('en-IE', {minimumFractionDigits:2,maximumFractionDigits:2})}</td>
+      <td>${sym}${cbNative}</td>
+      <td class="${sign(h.pnl)}">${pnlSign}€${Math.abs(h.pnl).toFixed(2)}<br><span style="font-size:11px">${pct(h.pnl_pct)}</span></td>
+      <td class="${sign(h.baseline_pnl_pct)}">${baseSign}${h.baseline_pnl_pct.toFixed(2)}%</td>
+    </tr>`;
+  }).join('');
+}
+
+// ── Crypto ─────────────────────────────────────────────────────────────────
+function renderCrypto() {
+  const crypto = (DATA.portfolio || {}).crypto || [];
+  const section = document.getElementById('crypto-section');
+  const tbody = document.getElementById('crypto-body');
+
+  if (!crypto.length) {
+    section.style.display = 'none';
+    return;
+  }
+  section.style.display = '';
+
+  tbody.innerHTML = crypto.map(c => `<tr>
+    <td class="left">
+      <strong>${c.symbol}</strong>
+      <span class="broker-tag">${c.broker || ''}</span>
+    </td>
+    <td>${c.amount}</td>
+    <td>€${c.price_eur.toLocaleString('en-IE', {minimumFractionDigits:2, maximumFractionDigits:4})}</td>
+    <td>€${c.market_value.toLocaleString('en-IE', {minimumFractionDigits:2, maximumFractionDigits:2})}</td>
+  </tr>`).join('');
+}
+
+// ── Signals ────────────────────────────────────────────────────────────────
+function signalBadgeClass(type) {
+  if (!type) return 'badge-watch';
+  const t = type.toUpperCase();
+  if (t.startsWith('BUY'))   return 'badge-buy';
+  if (t.startsWith('SELL'))  return 'badge-sell';
+  return 'badge-watch';
+}
+
+function renderSignals() {
+  const signals = DATA.signals_recent || [];
+  const el = document.getElementById('signals-list');
+
+  if (!signals.length) {
+    el.innerHTML = '<div class="empty">No signals in the last 7 days</div>';
+    return;
+  }
+
+  el.innerHTML = signals.map(s => {
+    const ts = (s.timestamp || '').slice(0, 16).replace('T', ' ');
+    const price = s.price != null ? '@ €' + parseFloat(s.price).toFixed(2) : '';
+    const label = (s.signal_type || 'WATCH').replace(/_/g, ' ').toUpperCase();
+    return `<div class="signal-card">
+      <div>
+        <span class="signal-badge ${signalBadgeClass(s.signal_type)}">${label}</span>
+      </div>
+      <div class="signal-info">
+        <div class="signal-ticker">${s.ticker} <span style="font-size:12px;font-weight:400;color:var(--muted)">${price}</span></div>
+        <div class="signal-reason">${s.reason || ''}</div>
+        <div class="signal-meta">${ts}</div>
+      </div>
+    </div>`;
+  }).join('');
+}
+
+// ── Discovery ──────────────────────────────────────────────────────────────
+function renderDiscovery() {
+  const disc = DATA.discovery_recent || [];
+  const el = document.getElementById('discovery-list');
+
+  if (!disc.length) {
+    el.innerHTML = '<div class="empty">No new opportunities flagged in the last 7 days</div>';
+    return;
+  }
+
+  el.innerHTML = disc.map(d => {
+    const tags = (d.signals || []).map(s => `<span class="disc-signal-tag">${s}</span>`).join('');
+    return `<div class="disc-card">
+      <div class="disc-header">
+        <span class="disc-ticker">${d.ticker}</span>
+        <span class="disc-score">Score ${d.score}</span>
+        <span class="disc-time">${d.discovered_at || ''}</span>
+      </div>
+      <div class="disc-signals">${tags || '<span style="color:var(--muted);font-size:12px">No signal tags</span>'}</div>
+    </div>`;
+  }).join('');
+}
+
+// ── Watchlist ──────────────────────────────────────────────────────────────
+function renderWatchlist() {
+  const manual = DATA.config_watchlist || [];
+  const auto   = (DATA.auto_watchlist || []).map(w => w.ticker);
+  const el = document.getElementById('watchlist-chips');
+
+  const allManual = manual.map(t => `<div class="wl-chip manual">${t}</div>`);
+  const allAuto   = auto.filter(t => !manual.includes(t)).map(t => `<div class="wl-chip auto">${t} <span style="font-size:9px;opacity:0.7">auto</span></div>`);
+  const chips = [...allManual, ...allAuto];
+
+  if (!chips.length) {
+    el.innerHTML = '<div class="empty">Watchlist is empty</div>';
+    return;
+  }
+  el.innerHTML = chips.join('');
+}
+
+// ── Signal Outcomes ────────────────────────────────────────────────────────
+function renderOutcomes() {
+  const outcomes = DATA.signal_outcomes || {};
+  const el = document.getElementById('outcomes-grid');
+  const keys = Object.keys(outcomes);
+
+  if (!keys.length) {
+    el.innerHTML = '<div class="empty">Signal performance data will appear after a few weeks of operation</div>';
+    return;
+  }
+
+  el.innerHTML = keys.map(type => {
+    const o = outcomes[type];
+    const label = type.replace(/_/g, ' ').toUpperCase();
+    const wr = o.win_rate_30d != null ? o.win_rate_30d + '%' : '—';
+    const r7  = o.avg_7d  != null ? fmt(o.avg_7d) + '%'  : '—';
+    const r30 = o.avg_30d != null ? fmt(o.avg_30d) + '%' : '—';
+    const r90 = o.avg_90d != null ? fmt(o.avg_90d) + '%' : '—';
+
+    return `<div class="outcome-card">
+      <div class="outcome-type ${sign(o.avg_30d)}">${label}</div>
+      <div class="outcome-stat"><span>Signals</span><span>${o.total}</span></div>
+      <div class="outcome-stat"><span>7D avg</span><span class="${sign(o.avg_7d)}">${r7}</span></div>
+      <div class="outcome-stat"><span>30D avg</span><span class="${sign(o.avg_30d)}">${r30}</span></div>
+      <div class="outcome-stat"><span>90D avg</span><span class="${sign(o.avg_90d)}">${r90}</span></div>
+      <div class="outcome-stat"><span>Win rate</span><span class="${o.win_rate_30d >= 50 ? 'pos' : 'neg'}">${wr}</span></div>
+    </div>`;
+  }).join('');
+}
+
+// ── Auto Refresh ───────────────────────────────────────────────────────────
+// Reload data every 30 minutes automatically (matches analyst run interval)
+// Auto-refresh every 30 min (only when already unlocked)
+setInterval(() => { if (DATA) loadData(true); }, 30 * 60 * 1000);
+
+// ── Init ───────────────────────────────────────────────────────────────────
+loadData();
+</script>
+</div><!-- /dashboard-content -->
+</body>
+</html>
