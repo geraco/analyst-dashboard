@@ -1,0 +1,409 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Deep Dive: EXC</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#0f1117;--surface:#1a1d27;--surface2:#22263a;--border:#2e3350;
+  --text:#e2e8f0;--muted:#7a82a0;
+  --green:#22c55e;--red:#ef4444;--yellow:#eab308;--blue:#3b82f6;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  background:var(--bg);color:var(--text);font-size:14px;line-height:1.6}
+.header{background:var(--surface);border-bottom:1px solid var(--border);
+  padding:20px 32px;display:flex;align-items:center;justify-content:space-between}
+.header-left h1{font-size:24px;font-weight:800}
+.header-left p{color:var(--muted);font-size:13px;margin-top:2px}
+.verdict-badge{padding:10px 24px;border-radius:10px;font-size:20px;font-weight:800;
+  background:#eab30822;color:#eab308;border:2px solid #eab30855}
+.conf-badge{font-size:11px;color:var(--muted);text-align:right;margin-top:4px}
+.container{max-width:1200px;margin:0 auto;padding:24px 32px}
+.liner{background:var(--surface);border:1px solid var(--border);border-left:4px solid #eab308;
+  border-radius:8px;padding:16px 20px;margin-bottom:24px;font-size:15px;font-style:italic}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:24px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px}
+.card h3{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;
+  color:var(--muted);margin-bottom:10px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px}
+.stat-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.stat-value{font-size:22px;font-weight:700;margin-top:2px}
+.stat-sub{font-size:11px;color:var(--muted);margin-top:2px}
+.section{margin-bottom:28px}
+.section-title{font-size:12px;font-weight:700;text-transform:uppercase;
+  letter-spacing:.06em;color:var(--muted);margin-bottom:12px;
+  padding-bottom:8px;border-bottom:1px solid var(--border)}
+.chart-wrap{height:260px;position:relative}
+ul.bullets{list-style:none;padding:0}
+ul.bullets li{padding:6px 0;border-bottom:1px solid var(--border);font-size:13px}
+ul.bullets li:last-child{border-bottom:none}
+ul.bullets li.pos::before{content:"▲ ";color:var(--green)}
+ul.bullets li.neg::before{content:"▼ ";color:var(--red)}
+ul.bullets li.risk::before{content:"⚠ ";color:var(--yellow)}
+ul.bullets li.cat::before{content:"→ ";color:var(--blue)}
+.analysis-text{font-size:13px;line-height:1.8;color:var(--text);
+  white-space:pre-wrap;word-break:break-word}
+.kv-table{width:100%;border-collapse:collapse}
+.kv-table td{padding:6px 0;border-bottom:1px solid var(--border);font-size:13px}
+.kv-table td:first-child{color:var(--muted);width:55%}
+.kv-table td:last-child{text-align:right;font-weight:600}
+table.data{width:100%;border-collapse:collapse;font-size:12px}
+table.data th{background:var(--surface2);color:var(--muted);font-size:10px;
+  font-weight:700;text-transform:uppercase;padding:7px 10px;text-align:right}
+table.data th:first-child{text-align:left}
+table.data td{padding:7px 10px;border-top:1px solid var(--border);text-align:right}
+table.data td:first-child{text-align:left}
+.pos{color:var(--green)}
+.neg{color:var(--red)}
+.neu{color:var(--text)}
+.news-item{padding:10px 0;border-bottom:1px solid var(--border)}
+.news-item:last-child{border-bottom:none}
+.news-item p{font-size:13px;margin-top:4px}
+.news-date{font-size:11px;color:var(--muted);margin-right:8px}
+.news-source{font-size:11px;color:var(--blue)}
+.level-pill{display:inline-block;padding:3px 10px;border-radius:5px;font-weight:700;font-size:13px}
+.footer{text-align:center;color:var(--muted);font-size:11px;padding:24px;margin-top:32px;
+  border-top:1px solid var(--border)}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <h1>Exelon Corporation &nbsp;<span style="font-weight:400;color:var(--muted);font-size:18px">(EXC)</span></h1>
+    <p>Utilities · Utilities - Regulated Electric · United States · Generated 11 May 2026 17:40</p>
+  </div>
+  <div style="text-align:right">
+    <div class="verdict-badge">HOLD &nbsp; LONG-TERM</div>
+    <div class="conf-badge">Confidence: HIGH</div>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- One-liner -->
+  <div class="liner">"A fairly valued, heavily leveraged regulated utility with solid but unspectacular growth prospects and no margin of safety at current prices."</div>
+
+  <!-- Key stats row -->
+  <div class="grid4">
+    <div class="stat-card">
+      <div class="stat-label">Current Price</div>
+      <div class="stat-value">USD44.29</div>
+      <div class="stat-sub">1yr: +0.0%</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Analyst Target</div>
+      <div class="stat-value ">USD—</div>
+      <div class="stat-sub">Upside: —</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Market Cap</div>
+      <div class="stat-value">USD45.3B</div>
+      <div class="stat-sub">EV: USD95.5B</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Forward P/E</div>
+      <div class="stat-value">14.57</div>
+      <div class="stat-sub">Trailing: 16.22</div>
+    </div>
+  </div>
+
+  <!-- Price Chart -->
+  <div class="section">
+    <div class="section-title">12-Month Price History</div>
+    <div class="card">
+      <div class="chart-wrap"><canvas id="priceChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Bull / Bear / Risks -->
+  <div class="grid3">
+    <div class="card">
+      <h3>Bull Case</h3>
+      <ul class="bullets"><li class="pos">Data center demand growth in key service territories (ComEd, Pepco) could drive above-average rate base growth and earnings acceleration</li><li class="pos">Shift toward transmission capex offers more predictable FERC-regulated returns and reduces state regulatory risk</li><li class="pos">Consistent 5-7% EPS growth target with dividend growth tracking earnings provides a reliable total return profile for income investors</li></ul>
+    </div>
+    <div class="card">
+      <h3>Bear Case</h3>
+      <ul class="bullets"><li class="neg">Debt/equity of 175% and $51B+ in total debt create meaningful refinancing and credit risk, especially if rates stay elevated</li><li class="neg">Free cash flow is deeply negative (-$2.8B) and the dividend is effectively debt-funded, which is unsustainable long-term without improved cash conversion</li><li class="neg">Customer affordability pressures acknowledged by management could lead to adverse regulatory outcomes, lower allowed ROEs, or capex disallowances</li></ul>
+    </div>
+    <div class="card">
+      <h3>Key Risks</h3>
+      <ul class="bullets"><li class="risk">Adverse regulatory outcomes across any of six state jurisdictions could compress returns on the massive capex program</li><li class="risk">Rising interest rates would increase borrowing costs on $51B+ debt stack and reduce relative attractiveness of dividend yield</li><li class="risk">Credit rating downgrade would increase cost of capital and potentially limit access to debt markets needed to fund capex</li></ul>
+      <h3 style="margin-top:16px">Catalysts</h3>
+      <ul class="bullets"><li class="cat">Favorable rate case outcomes in key jurisdictions (especially ComEd in Illinois) validating the capex investment thesis</li><li class="cat">Acceleration of data center interconnection agreements providing visibility into future load growth and rate base expansion</li></ul>
+    </div>
+  </div>
+
+  <!-- Assessments -->
+  <div class="grid2">
+    <div class="card">
+      <h3>Technical Picture</h3>
+      <p style="font-size:13px;line-height:1.7;margin-bottom:14px">EXC is trading in the lower half of its 52-week range ($41.11-$50.29), currently at $44.29. The stock has underperformed with only 4.2% total return over the past year, and the post-earnings dip despite a beat suggests limited near-term momentum. Support appears firm near $41, with resistance around $47-48.</p>
+      <h3 style="margin-bottom:8px">Key Levels</h3>
+      <table class="kv-table">
+        <tr><td>Support</td><td>USD41.00</td></tr>
+        <tr><td>Resistance</td><td>USD47.50</td></tr>
+        <tr><td>Price Target</td><td class="pos">USD46.00</td></tr>
+      </table>
+    </div>
+    <div class="card">
+      <h3>Fundamental Assessment</h3>
+      <p style="font-size:13px;line-height:1.7;margin-bottom:14px">Fundamentals are adequate but not compelling — the stock trades at fair value (16.2x trailing vs. 16.2x sector), ROE of 9.76% is decent, and revenue growth of ~8% is solid. However, the extreme leverage (175% D/E), negative free cash flow, and flat earnings growth despite revenue gains are concerning and suggest margin/cost pressures are intensifying.</p>
+      <h3 style="margin-bottom:8px">What to Watch</h3>
+      <ul class="bullets"><li class="cat">Upcoming rate case decisions across key jurisdictions (ComEd, PECO, BGE) and allowed ROE outcomes</li><li class="cat">Trajectory of interest rates and implications for Exelon's refinancing costs on $51B+ debt</li><li class="cat">Data center load growth materialization — signed interconnection agreements and timeline to revenue</li><li class="cat">Free cash flow trajectory — whether the inflection to positive FCF occurs as capex spending peaks</li><li class="cat">Credit rating agency commentary on leverage and capital spending plans</li></ul>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <h3>News & Sentiment</h3>
+      <p style="font-size:13px;line-height:1.7">Q1 2026 earnings beat was modest (+2.6% vs. estimate) and the market shrugged it off. The capex increase to $41.7B is a double-edged sword — growth potential but balance sheet strain. Management's explicit acknowledgment of affordability concerns signals regulatory risk is front-of-mind internally.</p>
+    </div>
+    <div class="card">
+      <h3>Analysts & Insiders</h3>
+      <p style="font-size:13px;line-height:1.7;margin-bottom:8px">Overwhelmingly consensus HOLD (18 of 27 analysts), reflecting a view that the stock is fairly valued with limited catalysts. Only 26% of analysts have buy ratings, which is below average for a large-cap utility.</p>
+      <p style="font-size:13px;line-height:1.7">Recent insider purchases appear to be primarily board compensation-related (identical lot sizes on the same date), not open-market conviction buys. The signal is neutral to mildly positive at best.</p>
+    </div>
+  </div>
+
+  <!-- Financials snapshot -->
+  <div class="grid2">
+    <div class="card section">
+      <h3 class="section-title" style="margin-bottom:12px">Valuation & Profitability</h3>
+      <table class="kv-table">
+        <tr><td>Trailing P/E</td><td>16.22</td></tr>
+        <tr><td>Forward P/E</td><td>14.57</td></tr>
+        <tr><td>EV/EBITDA</td><td>11.57</td></tr>
+        <tr><td>Price/Book</td><td>1.55</td></tr>
+        <tr><td>Price/Sales</td><td>1.83</td></tr>
+        <tr><td>Gross Margin</td><td>+0.4%</td></tr>
+        <tr><td>Operating Margin</td><td>+0.2%</td></tr>
+        <tr><td>Net Margin</td><td>+0.1%</td></tr>
+        <tr><td>ROE</td><td>+0.1%</td></tr>
+        <tr><td>Revenue Growth</td><td>+0.1%</td></tr>
+      </table>
+    </div>
+    <div class="card section">
+      <h3 class="section-title" style="margin-bottom:12px">Financial Health</h3>
+      <table class="kv-table">
+        <tr><td>Market Cap</td><td>USD45.3B</td></tr>
+        <tr><td>Total Revenue</td><td>USD24.8B</td></tr>
+        <tr><td>EBITDA</td><td>USD8.2B</td></tr>
+        <tr><td>Free Cash Flow</td><td>USD-2.8B</td></tr>
+        <tr><td>Total Debt</td><td>USD51.2B</td></tr>
+        <tr><td>Total Cash</td><td>USD713M</td></tr>
+        <tr><td>Debt/Equity</td><td>174.79</td></tr>
+        <tr><td>Current Ratio</td><td>0.94</td></tr>
+        <tr><td>Short % Float</td><td>+0.0%</td></tr>
+        <tr><td>Dividend Yield</td><td>+3.8%</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- Earnings history -->
+  
+
+  <!-- Insider transactions -->
+  <div class="section">
+    <div class="section-title">Insider Transactions (last 90 days)</div>
+    <div class="card">
+      <table class="data">
+        <thead><tr><th class="left">Date</th><th class="left">Name</th><th>Action</th><th>Shares</th><th>Value</th></tr></thead>
+        <tbody><tr>
+          <td>2026-04-28</td>
+          <td>Rogers Matthew C</td>
+          <td class="pos">BUY</td>
+          <td>3,720</td>
+          <td>—</td>
+        </tr><tr>
+          <td>2026-04-28</td>
+          <td>Segedi Bryan K</td>
+          <td class="pos">BUY</td>
+          <td>3,720</td>
+          <td>—</td>
+        </tr><tr>
+          <td>2026-04-28</td>
+          <td>Jojo Linda P</td>
+          <td class="pos">BUY</td>
+          <td>3,720</td>
+          <td>—</td>
+        </tr><tr>
+          <td>2026-04-28</td>
+          <td>DEWALT DAVID G</td>
+          <td class="pos">BUY</td>
+          <td>3,720</td>
+          <td>—</td>
+        </tr><tr>
+          <td>2026-04-28</td>
+          <td>RICHO ANNA</td>
+          <td class="pos">BUY</td>
+          <td>3,720</td>
+          <td>—</td>
+        </tr><tr>
+          <td>2026-04-28</td>
+          <td>Lillie Charisse R</td>
+          <td class="pos">BUY</td>
+          <td>3,720</td>
+          <td>—</td>
+        </tr><tr>
+          <td>2026-04-28</td>
+          <td>Cheshire Marjorie Rodgers</td>
+          <td class="pos">BUY</td>
+          <td>3,720</td>
+          <td>—</td>
+        </tr><tr>
+          <td>2026-04-28</td>
+          <td>BOWERS WILLIAM P</td>
+          <td class="pos">BUY</td>
+          <td>3,720</td>
+          <td>—</td>
+        </tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Recent news -->
+  <div class="section">
+    <div class="section-title">Recent News</div>
+    <div class="card"><div class="news-item"><span class="news-date">2026-05-07</span><span class="news-source">Yahoo</span><p>ComEd Energy Efficiency Program Receives National Recognition From Energy Coalition</p></div><div class="news-item"><span class="news-date">2026-05-07</span><span class="news-source">Yahoo</span><p>Exelon Q1 Earnings Beat Estimates, Sales Increase Y/Y, Capex Plan Up</p></div><div class="news-item"><span class="news-date">2026-05-07</span><span class="news-source">Yahoo</span><p>Exelon lowers utility spending to ease electric affordability issues</p></div><div class="news-item"><span class="news-date">2026-05-07</span><span class="news-source">Benzinga</span><p>Wall Street's Most Accurate Analysts Give Their Take On 3 Utilities Stocks Delivering High-Dividend Yields</p></div><div class="news-item"><span class="news-date">2026-05-07</span><span class="news-source">Yahoo</span><p>Exelon Corporation Q1 2026 Earnings Call Summary</p></div><div class="news-item"><span class="news-date">2026-05-06</span><span class="news-source">Finnhub</span><p>Utilities Down After Exelon Earnings - Utilities Roundup</p></div><div class="news-item"><span class="news-date">2026-05-06</span><span class="news-source">Benzinga</span><p>Earnings Scheduled For May 6, 2026</p></div><div class="news-item"><span class="news-date">2026-05-06</span><span class="news-source">Yahoo</span><p>Exelon Q1 Earnings Call Highlights</p></div><div class="news-item"><span class="news-date">2026-05-06</span><span class="news-source">Yahoo</span><p>Exelon (EXC) Q1 2026 Earnings Transcript</p></div><div class="news-item"><span class="news-date">2026-05-06</span><span class="news-source">SeekingAlpha</span><p>Exelon Corporation 2026 Q1 - Results - Earnings Call Presentation</p></div><div class="news-item"><span class="news-date">2026-05-06</span><span class="news-source">Zacks</span><p>Exelon (EXC) Surpasses Q1 Earnings and Revenue Estimates</p></div><div class="news-item"><span class="news-date">2026-05-06</span><span class="news-source">The Wall Street Journal</span><p>Earnings Season, Jobs Report: What to Watch the Rest of the Week</p></div><div class="news-item"><span class="news-date">2026-05-05</span><span class="news-source">Zacks</span><p>Ballard Power Systems (BLDP) Reports Q1 Loss, Misses Revenue Estimates</p></div><div class="news-item"><span class="news-date">2026-05-05</span><span class="news-source">Simply Wall St.</span><p>A Look At Exelon (EXC) Valuation As Recent Returns Send Mixed Signals</p></div><div class="news-item"><span class="news-date">2026-05-04</span><span class="news-source">Zacks</span><p>Exelon to Post Q1 Earnings: What's in the Cards for the Stock?</p></div></div>
+  </div>
+
+  <!-- Full Claude analysis (collapsible) -->
+  <div class="section">
+    <details>
+      <summary style="cursor:pointer;font-size:12px;font-weight:700;text-transform:uppercase;
+        letter-spacing:.06em;color:var(--muted);padding:8px 0;border-bottom:1px solid var(--border)">
+        Full AI Analysis (click to expand)
+      </summary>
+      <div class="card" style="margin-top:12px;padding:20px">
+        <pre class="analysis-text"># Exelon Corporation (EXC) — Equity Research Report
+
+## Executive Summary
+
+Exelon is the largest regulated electric utility holding company in the United States by customer count, serving approximately 10 million customers across six utilities (ComEd, PECO, BGE, Pepco, Delmarva Power, and Atlantic City Electric). Following the 2022 spin-off of its competitive generation business (now Constellation Energy), Exelon is a pure-play regulated utility — a simpler, more predictable business, but one whose upside is fundamentally capped by regulatory outcomes and capital deployment efficiency. The stock trades at roughly fair value versus its sector, with a few notable concerns beneath the surface.
+
+---
+
+## Valuation Assessment
+
+Exelon's trailing P/E of 16.2x is essentially in line with the sector average of 16.2x and its own 5-year average. The forward P/E of 14.6x suggests modest earnings growth is priced in, but this is not a discounted entry point by any means. EV/EBITDA at 11.6x is reasonable but not cheap for a regulated utility.
+
+**The Price/Free Cash Flow of 275.6x is a glaring red flag.** Free cash flow is deeply negative at -€2.8B, which is characteristic of a utility in heavy capital spending mode — but it means the dividend (which at a reported 383% yield appears to be a data error, likely reflecting a special distribution or data feed issue) is being funded by debt issuance, not organic cash flow. This is a structural concern.
+
+Price/Book at 1.55x is moderate, suggesting the market is not pricing in excessive growth but is paying a premium to book value that needs to be justified by earned returns above cost of equity — ROE at 9.76% is adequate but not exceptional for a regulated utility.
+
+---
+
+## Financial Health — The Elephant in the Room
+
+**Debt is the dominant issue for Exelon.** Total debt of €51.2B against total cash of just €713M and equity implying a Debt/Equity ratio of 174.8% is extremely elevated. For context, this is high even by utility standards. The current ratio of 0.94 and quick ratio of 0.60 indicate thin liquidity.
+
+The company just raised its capex plan to $41.7B through 2029, which will require continued capital market access. In a rising or elevated interest rate environment, this poses meaningful refinancing and cost-of-capital risk. Operating cash flow of €6.8B is solid, but it is being more than consumed by capital expenditures, resulting in persistently negative free cash flow.
+
+**The critical question for Exelon investors is whether regulators will allow the company to earn adequate returns on its massive and growing rate base.** If regulatory outcomes disappoint — which is a real risk given the company's own acknowledgment of "affordability issues" — the returns on this capital may compress.
+
+---
+
+## Growth & Strategy
+
+Revenue grew 7.9% YoY in Q1 2026, driven by higher rates, favorable weather, and growing electricity demand (partly from data center load). The company raised its capex plan, with a notable shift toward transmission spending and away from distribution operations. This is strategically sound — transmission investments generally earn more predictable, FERC-regulated returns compared to state-level distribution rate cases.
+
+However, earnings growth was essentially flat (-0.3% YoY), meaning higher revenues are being absorbed by higher costs, depreciation, and interest expense. The 3-year EPS CAGR of 7.55% is decent but needs to be sustained, and the path to continued EPS growth requires successful regulatory execution across multiple jurisdictions.
+
+The data center demand narrative is real but should not be overstated. Exelon's service territories (especially ComEd in northern Illinois and Pepco in the D.C. metro area) are well-positioned for data center load growth, but the timeline and magnitude of incremental earnings contribution are uncertain.
+
+---
+
+## Recent Earnings & News
+
+Q1 2026 results were solid: $0.91 EPS vs. $0.8875 estimate (a modest beat), revenue of $7.24B vs. $6.91B estimate. However, the stock fell ~1% post-earnings, suggesting the beat was expected and/or the market is focused on the capex/leverage trajectory.
+
+Management's commentary about lowering utility spending to "ease affordability issues" is notable. This is a tacit admission that customer bill pressure is becoming a political and regulatory constraint. Utilities that push rates too aggressively risk adverse regulatory outcomes — rate case disallowances, lower allowed ROEs, or delayed cost recovery.
+
+---
+
+## Insider Activity
+
+The recent insider buying is interesting but needs context. The April 28 purchases of exactly 3,720 shares each by eight different board members/insiders strongly suggest restricted stock unit vesting or a director stock compensation plan rather than open-market conviction purchases. Matthew Rogers' additional purchases in March are more meaningful but still modest in dollar terms. **Net assessment: mildly positive signal but not a strong conviction indicator.**
+
+---
+
+## Analyst Consensus
+
+The consensus is overwhelmingly HOLD (18 out of 27 analysts), with only 7 buy-side recommendations and 2 sells. This is a classic "fully valued, no catalyst" consensus for a regulated utility. The lack of available price targets is a limitation, but the distribution of ratings tells the story: analysts see limited upside from current levels.
+
+---
+
+## Dividend Assessment
+
+The reported 383% dividend yield is almost certainly a data error — likely reflecting the Constellation spin-off distribution or a feed calculation issue. Exelon's actual annual dividend is approximately $1.52/share (recently raised), giving a yield around 3.4%. This is competitive for the utility sector but not exceptional. Dividend growth should track EPS growth of 5-7%, which is the company's stated target. The payout ratio appears manageable on an earnings basis, but the deeply negative free cash flow means the dividend is effectively debt-funded.
+
+---
+
+## Risk Assessment
+
+1. **Regulatory risk**: Exelon operates across six state jurisdictions plus FERC. Any adverse rate case outcome could materially impact earnings. The affordability narrative increases this risk.
+2. **Balance sheet risk**: With $51B+ in debt and an aggressive capex plan, Exelon is highly leveraged and dependent on capital markets access. A credit downgrade would meaningfully increase financing costs.
+3. **Interest rate sensitivity**: As a capital-intensive, dividend-paying utility with a low beta (0.42), EXC is a bond proxy. Rising long-term rates compress the relative attractiveness of the dividend and increase borrowing costs.
+4. **Execution risk**: A $41.7B capex program requires disciplined project management, timely regulatory approvals, and workforce availability. Cost overruns or delays are inevitable at this scale.
+
+---
+
+## Verdict
+
+Exelon is a fundamentally sound, well-run regulated utility trading at fair value. The Q1 beat was modest, the data center demand tailwind is real but priced in, and the balance sheet is stretched. The stock is 12% below its 52-week high and 8% above its low — it's in no-man's land technically. For income-oriented investors already holding, this is a reasonable HOLD. For new money, there's no compelling reason to rush in at current levels; better entry points are plausible if interest rates rise further or if regulatory headwinds materialize. The risk/reward is neutral.
+
+---</pre>
+      </div>
+    </details>
+  </div>
+
+</div><!-- /container -->
+
+<div class="footer">
+  Deep Dive generated 11 May 2026 17:40 · EXC · Not financial advice · For research purposes only
+</div>
+
+<script>
+const labels = ["2025-05-12", "2025-05-13", "2025-05-14", "2025-05-15", "2025-05-16", "2025-05-19", "2025-05-20", "2025-05-21", "2025-05-22", "2025-05-23", "2025-05-27", "2025-05-28", "2025-05-29", "2025-05-30", "2025-06-02", "2025-06-03", "2025-06-04", "2025-06-05", "2025-06-06", "2025-06-09", "2025-06-10", "2025-06-11", "2025-06-12", "2025-06-13", "2025-06-16", "2025-06-17", "2025-06-18", "2025-06-20", "2025-06-23", "2025-06-24", "2025-06-25", "2025-06-26", "2025-06-27", "2025-06-30", "2025-07-01", "2025-07-02", "2025-07-03", "2025-07-07", "2025-07-08", "2025-07-09", "2025-07-10", "2025-07-11", "2025-07-14", "2025-07-15", "2025-07-16", "2025-07-17", "2025-07-18", "2025-07-21", "2025-07-22", "2025-07-23", "2025-07-24", "2025-07-25", "2025-07-28", "2025-07-29", "2025-07-30", "2025-07-31", "2025-08-01", "2025-08-04", "2025-08-05", "2025-08-06", "2025-08-07", "2025-08-08", "2025-08-11", "2025-08-12", "2025-08-13", "2025-08-14", "2025-08-15", "2025-08-18", "2025-08-19", "2025-08-20", "2025-08-21", "2025-08-22", "2025-08-25", "2025-08-26", "2025-08-27", "2025-08-28", "2025-08-29", "2025-09-02", "2025-09-03", "2025-09-04", "2025-09-05", "2025-09-08", "2025-09-09", "2025-09-10", "2025-09-11", "2025-09-12", "2025-09-15", "2025-09-16", "2025-09-17", "2025-09-18", "2025-09-19", "2025-09-22", "2025-09-23", "2025-09-24", "2025-09-25", "2025-09-26", "2025-09-29", "2025-09-30", "2025-10-01", "2025-10-02", "2025-10-03", "2025-10-06", "2025-10-07", "2025-10-08", "2025-10-09", "2025-10-10", "2025-10-13", "2025-10-14", "2025-10-15", "2025-10-16", "2025-10-17", "2025-10-20", "2025-10-21", "2025-10-22", "2025-10-23", "2025-10-24", "2025-10-27", "2025-10-28", "2025-10-29", "2025-10-30", "2025-10-31", "2025-11-03", "2025-11-04", "2025-11-05", "2025-11-06", "2025-11-07", "2025-11-10", "2025-11-11", "2025-11-12", "2025-11-13", "2025-11-14", "2025-11-17", "2025-11-18", "2025-11-19", "2025-11-20", "2025-11-21", "2025-11-24", "2025-11-25", "2025-11-26", "2025-11-28", "2025-12-01", "2025-12-02", "2025-12-03", "2025-12-04", "2025-12-05", "2025-12-08", "2025-12-09", "2025-12-10", "2025-12-11", "2025-12-12", "2025-12-15", "2025-12-16", "2025-12-17", "2025-12-18", "2025-12-19", "2025-12-22", "2025-12-23", "2025-12-24", "2025-12-26", "2025-12-29", "2025-12-30", "2025-12-31", "2026-01-02", "2026-01-05", "2026-01-06", "2026-01-07", "2026-01-08", "2026-01-09", "2026-01-12", "2026-01-13", "2026-01-14", "2026-01-15", "2026-01-16", "2026-01-20", "2026-01-21", "2026-01-22", "2026-01-23", "2026-01-26", "2026-01-27", "2026-01-28", "2026-01-29", "2026-01-30", "2026-02-02", "2026-02-03", "2026-02-04", "2026-02-05", "2026-02-06", "2026-02-09", "2026-02-10", "2026-02-11", "2026-02-12", "2026-02-13", "2026-02-17", "2026-02-18", "2026-02-19", "2026-02-20", "2026-02-23", "2026-02-24", "2026-02-25", "2026-02-26", "2026-02-27", "2026-03-02", "2026-03-03", "2026-03-04", "2026-03-05", "2026-03-06", "2026-03-09", "2026-03-10", "2026-03-11", "2026-03-12", "2026-03-13", "2026-03-16", "2026-03-17", "2026-03-18", "2026-03-19", "2026-03-20", "2026-03-23", "2026-03-24", "2026-03-25", "2026-03-26", "2026-03-27", "2026-03-30", "2026-03-31", "2026-04-01", "2026-04-02", "2026-04-06", "2026-04-07", "2026-04-08", "2026-04-09", "2026-04-10", "2026-04-13", "2026-04-14", "2026-04-15", "2026-04-16", "2026-04-17", "2026-04-20", "2026-04-21", "2026-04-22", "2026-04-23", "2026-04-24", "2026-04-27", "2026-04-28", "2026-04-29", "2026-04-30", "2026-05-01", "2026-05-04", "2026-05-05", "2026-05-06", "2026-05-07", "2026-05-08", "2026-05-11"];
+const prices = [42.4871, 41.8636, 41.1621, 42.3118, 42.9548, 43.247, 43.1204, 43.0522, 42.302, 42.5456, 42.7794, 42.1656, 42.5748, 42.6917, 42.6625, 42.341, 41.6493, 41.7564, 41.5226, 41.1134, 41.8149, 41.7759, 42.5164, 42.1364, 41.5811, 41.2985, 41.2791, 41.5031, 42.0877, 41.9903, 41.2011, 41.4155, 41.8051, 42.302, 42.2923, 41.8149, 42.0195, 42.0585, 41.8928, 42.0292, 42.5066, 42.3897, 42.3118, 41.8441, 41.7467, 41.8441, 42.2825, 42.604, 43.3055, 42.3702, 42.6138, 42.8573, 42.2923, 43.1594, 43.1204, 43.7829, 43.5198, 44.007, 43.5393, 43.8998, 44.3674, 44.1531, 43.9467, 43.8484, 44.4578, 43.8877, 43.8189, 43.2488, 43.9762, 44.1138, 43.8779, 44.1924, 43.8386, 43.6616, 43.6321, 43.0129, 42.9343, 42.6296, 42.6394, 42.6001, 42.6885, 42.2855, 42.3543, 42.5804, 42.7573, 42.6394, 42.6885, 42.0005, 42.4919, 42.374, 42.6689, 42.659, 43.4749, 43.4749, 43.0326, 43.3373, 43.5142, 44.2416, 44.2907, 44.2022, 44.5659, 44.91, 45.9912, 45.8241, 45.8634, 46.2664, 46.0501, 46.5711, 47.0134, 46.5514, 46.9643, 47.4164, 47.1805, 47.2886, 46.7873, 47.2198, 47.2493, 46.8856, 46.3942, 46.2664, 45.3326, 45.4112, 45.5882, 45.3621, 44.9296, 45.4211, 45.074, 45.0542, 45.5401, 45.0641, 45.55, 46.2044, 45.9862, 45.1732, 45.0245, 45.3616, 45.8375, 45.3913, 46.1746, 46.72, 45.3021, 44.618, 44.1619, 43.5372, 43.4381, 42.9621, 43.3885, 42.9126, 42.7242, 43.2001, 43.4975, 43.3885, 43.8446, 43.9041, 43.2893, 43.1803, 43.091, 43.1505, 43.1902, 43.2596, 43.5471, 43.2199, 43.5471, 43.1703, 43.4678, 42.625, 43.0811, 42.9324, 42.5358, 42.9522, 43.2298, 43.7752, 44.3502, 44.5684, 44.618, 44.2213, 43.6859, 44.1718, 44.4494, 44.38, 44.033, 44.3998, 43.5372, 43.6364, 43.0613, 43.6859, 43.9536, 43.5967, 44.261, 44.0726, 47.1463, 48.0684, 47.6321, 46.8389, 46.9579, 47.3843, 47.7908, 48.1775, 48.2865, 48.3857, 49.05, 49.17, 48.96, 49.25, 48.77, 49.36, 49.14, 49.01, 48.84, 49.48, 49.82, 50.29, 50.04, 49.25, 48.01, 46.44, 47.17, 47.29, 47.67, 48.4, 48.32, 49.11, 49.02, 48.88, 49.33, 48.94, 49.05, 49.17, 49.44, 48.57, 48.15, 48.66, 47.88, 47.59, 47.02, 46.4, 46.27, 45.86, 46.75, 46.92, 46.59, 47.04, 47.02, 45.99, 46.5, 46.61, 46.18, 45.02, 44.41, 43.91, 44.29];
+const ctx = document.getElementById('priceChart').getContext('2d');
+const grad = ctx.createLinearGradient(0,0,0,260);
+grad.addColorStop(0, 'rgba(234,179,8,0.25)');
+grad.addColorStop(1, 'rgba(234,179,8,0.0)');
+new Chart(ctx, {
+  type:'line',
+  data:{
+    labels,
+    datasets:[{
+      data:prices,
+      borderColor:'#eab308',
+      backgroundColor:grad,
+      borderWidth:2,
+      pointRadius:0,
+      pointHoverRadius:4,
+      fill:true,
+      tension:0.3
+    }]
+  },
+  options:{
+    responsive:true,maintainAspectRatio:false,
+    interaction:{mode:'index',intersect:false},
+    plugins:{
+      legend:{display:false},
+      tooltip:{callbacks:{label:c=>'  USD'+c.parsed.y.toFixed(2)}}
+    },
+    scales:{
+      x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#7a82a0',font:{size:10},maxTicksLimit:12,maxRotation:0}},
+      y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#7a82a0',font:{size:10},callback:v=>'USD'+v.toFixed(0)}}
+    }
+  }
+});
+</script>
+</body>
+</html>
