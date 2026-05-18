@@ -1,0 +1,462 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Deep Dive: NKE</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js"></script>
+<style>
+:root{
+  --bg:#0f1117;--surface:#1a1d27;--surface2:#22263a;--border:#2e3350;
+  --text:#e2e8f0;--muted:#7a82a0;
+  --green:#22c55e;--red:#ef4444;--yellow:#eab308;--blue:#3b82f6;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  background:var(--bg);color:var(--text);font-size:14px;line-height:1.6}
+.header{background:var(--surface);border-bottom:1px solid var(--border);
+  padding:20px 32px;display:flex;align-items:center;justify-content:space-between}
+.header-left h1{font-size:24px;font-weight:800}
+.header-left p{color:var(--muted);font-size:13px;margin-top:2px}
+.verdict-badge{padding:10px 24px;border-radius:10px;font-size:20px;font-weight:800;
+  background:#eab30822;color:#eab308;border:2px solid #eab30855}
+.conf-badge{font-size:11px;color:var(--muted);text-align:right;margin-top:4px}
+.container{max-width:1200px;margin:0 auto;padding:24px 32px}
+.liner{background:var(--surface);border:1px solid var(--border);border-left:4px solid #eab308;
+  border-radius:8px;padding:16px 20px;margin-bottom:24px;font-size:15px;font-style:italic}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:24px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px}
+.card h3{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;
+  color:var(--muted);margin-bottom:10px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px}
+.stat-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.stat-value{font-size:22px;font-weight:700;margin-top:2px}
+.stat-sub{font-size:11px;color:var(--muted);margin-top:2px}
+.section{margin-bottom:28px}
+.section-title{font-size:12px;font-weight:700;text-transform:uppercase;
+  letter-spacing:.06em;color:var(--muted);margin-bottom:12px;
+  padding-bottom:8px;border-bottom:1px solid var(--border)}
+.chart-wrap{height:260px;position:relative}
+ul.bullets{list-style:none;padding:0}
+ul.bullets li{padding:6px 0;border-bottom:1px solid var(--border);font-size:13px}
+ul.bullets li:last-child{border-bottom:none}
+ul.bullets li.pos::before{content:"▲ ";color:var(--green)}
+ul.bullets li.neg::before{content:"▼ ";color:var(--red)}
+ul.bullets li.risk::before{content:"⚠ ";color:var(--yellow)}
+ul.bullets li.cat::before{content:"→ ";color:var(--blue)}
+.analysis-text{font-size:13px;line-height:1.8;color:var(--text);
+  white-space:pre-wrap;word-break:break-word}
+.kv-table{width:100%;border-collapse:collapse}
+.kv-table td{padding:6px 0;border-bottom:1px solid var(--border);font-size:13px}
+.kv-table td:first-child{color:var(--muted);width:55%}
+.kv-table td:last-child{text-align:right;font-weight:600}
+table.data{width:100%;border-collapse:collapse;font-size:12px}
+table.data th{background:var(--surface2);color:var(--muted);font-size:10px;
+  font-weight:700;text-transform:uppercase;padding:7px 10px;text-align:right}
+table.data th:first-child{text-align:left}
+table.data td{padding:7px 10px;border-top:1px solid var(--border);text-align:right}
+table.data td:first-child{text-align:left}
+.pos{color:var(--green)}
+.neg{color:var(--red)}
+.neu{color:var(--text)}
+.news-item{padding:10px 0;border-bottom:1px solid var(--border)}
+.news-item:last-child{border-bottom:none}
+.news-item p{font-size:13px;margin-top:4px}
+.news-date{font-size:11px;color:var(--muted);margin-right:8px}
+.news-source{font-size:11px;color:var(--blue)}
+.level-pill{display:inline-block;padding:3px 10px;border-radius:5px;font-weight:700;font-size:13px}
+.footer{text-align:center;color:var(--muted);font-size:11px;padding:24px;margin-top:32px;
+  border-top:1px solid var(--border)}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <h1>Nike, Inc. &nbsp;<span style="font-weight:400;color:var(--muted);font-size:18px">(NKE)</span></h1>
+    <p>Consumer Cyclical · Footwear & Accessories · United States · Generated 18 May 2026 22:58</p>
+  </div>
+  <div style="text-align:right">
+    <div class="verdict-badge">HOLD &nbsp; LONG-TERM</div>
+    <div class="conf-badge">Confidence: MEDIUM</div>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- One-liner -->
+  <div class="liner">"Nike's brand remains powerful but the turnaround is unproven, margins are collapsing, competition is intensifying, and the stock is not yet cheap enough to compensate for the risks."</div>
+
+  <!-- Key stats row -->
+  <div class="grid4">
+    <div class="stat-card">
+      <div class="stat-label">Current Price</div>
+      <div class="stat-value">USD42.57</div>
+      <div class="stat-sub">1yr: -0.3%</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Analyst Target</div>
+      <div class="stat-value ">USD—</div>
+      <div class="stat-sub">Upside: —</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Market Cap</div>
+      <div class="stat-value">USD63.0B</div>
+      <div class="stat-sub">EV: USD65.1B</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Forward P/E</div>
+      <div class="stat-value">23.33</div>
+      <div class="stat-sub">Trailing: 28.01</div>
+    </div>
+  </div>
+
+  <!-- Price Chart -->
+  <div class="section">
+    <div class="section-title">12-Month Price History</div>
+    <div class="card">
+      <div class="chart-wrap"><canvas id="priceChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Bull / Bear / Risks -->
+  <div class="grid3">
+    <div class="card">
+      <h3>Bull Case</h3>
+      <ul class="bullets"><li class="pos">Iconic global brand with #1 market position and durable brand equity that has survived prior strategic missteps</li><li class="pos">New CEO Elliott Hill is executing a credible playbook (wholesale rebuild, sport-first innovation, inventory discipline) and backing it with personal share purchases</li><li class="pos">If operating margins recover from ~7% to even 10-11%, EPS could roughly double, making current prices look attractive in hindsight</li></ul>
+    </div>
+    <div class="card">
+      <h3>Bear Case</h3>
+      <ul class="bullets"><li class="neg">Competitive landscape has structurally fragmented — On, Hoka, New Balance, and domestic Chinese brands are taking share that Nike may never fully reclaim</li><li class="neg">China market is deteriorating structurally, not cyclically, as domestic brands and geopolitical tensions erode Nike's position</li><li class="neg">At 28x trailing P/E with sub-7% operating margins and P/FCF of 59x, the stock is still expensive relative to its fundamentally weakened earnings power</li></ul>
+    </div>
+    <div class="card">
+      <h3>Key Risks</h3>
+      <ul class="bullets"><li class="risk">Tariff escalation on Vietnam/Indonesia/China sourcing further compresses margins and exposes Nike to class-action litigation</li><li class="risk">Turnaround timeline continues to extend — FY26Q4 EPS estimate of $0.12 suggests near-term profitability is essentially nonexistent</li><li class="risk">Knight founding family selling millions of shares near 12-year lows signals limited confidence from those with deepest company knowledge</li></ul>
+      <h3 style="margin-top:16px">Catalysts</h3>
+      <ul class="bullets"><li class="cat">FY26Q4 earnings on June 24 — any positive margin surprise or stronger forward guidance could spark a relief rally</li><li class="cat">Successful product launches (e.g., McDonald's co-brand, new performance running shoes) that demonstrate Nike can recapture cultural relevance and innovation leadership</li></ul>
+    </div>
+  </div>
+
+  <!-- Assessments -->
+  <div class="grid2">
+    <div class="card">
+      <h3>Technical Picture</h3>
+      <p style="font-size:13px;line-height:1.7;margin-bottom:14px">The stock is in a persistent downtrend, sitting just 1.6% above its 52-week low with no signs of basing or reversal. A break below $41.88 could trigger further selling into the mid-to-upper $30s. There is no technical reason to buy here until the stock proves it can hold support and form a constructive base.</p>
+      <h3 style="margin-bottom:8px">Key Levels</h3>
+      <table class="kv-table">
+        <tr><td>Support</td><td>USD41.88</td></tr>
+        <tr><td>Resistance</td><td>USD52.00</td></tr>
+        <tr><td>Price Target</td><td class="pos">USD48.00</td></tr>
+      </table>
+    </div>
+    <div class="card">
+      <h3>Fundamental Assessment</h3>
+      <p style="font-size:13px;line-height:1.7;margin-bottom:14px">Fundamentals are deteriorating — flat revenue, -35% earnings growth, operating margins at multi-decade lows of ~7%, and FCF has collapsed to $1.3B from $5-6B in better years. The stock appears optically cheaper than it is because the trailing P/E of 28x still reflects a premium valuation despite dramatically weakened earnings power. This is not yet a value opportunity.</p>
+      <h3 style="margin-bottom:8px">What to Watch</h3>
+      <ul class="bullets"><li class="cat">FY26Q4 earnings on June 24 — particularly operating margin trajectory, inventory levels, and FY27 guidance</li><li class="cat">North America wholesale sell-through data and retail partner commentary on Nike shelf space restoration</li><li class="cat">China revenue trends and any further tariff escalation impacting Vietnam/Indonesia sourcing costs</li><li class="cat">Monthly competitive market share data — whether Nike is stabilizing share loss to On, Hoka, New Balance</li><li class="cat">Dividend sustainability — if FCF remains at ~$1.3B and the annual dividend payout is ~$2.2B, a cut becomes possible</li></ul>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <h3>News & Sentiment</h3>
+      <p style="font-size:13px;line-height:1.7">News flow is overwhelmingly negative: China market pressure (WSJ), class-action lawsuits over tariff pricing, trading at 12-year lows, and competitors like On Running seeing insider buying while Nike's founding family sells. The McDonald's co-brand is a minor positive but doesn't move the needle on fundamental concerns.</p>
+    </div>
+    <div class="card">
+      <h3>Analysts & Insiders</h3>
+      <p style="font-size:13px;line-height:1.7;margin-bottom:8px">Consensus is lukewarm with the plurality of analysts (20 of 45) at Hold, and a mean recommendation of 2.24 that tilts toward Buy but lacks conviction. The absence of published price targets in the data suggests uncertainty about fair value.</p>
+      <p style="font-size:13px;line-height:1.7">Mixed signals: CEO Hill and board members (Cook, Rogers, Swan) are buying meaningfully, but Phil Knight (4.5M shares) and Travis Knight (~9.4M shares) are selling at depressed levels. Net insider sentiment is cautiously negative — those closest to the legacy are reducing exposure.</p>
+    </div>
+  </div>
+
+  <!-- Financials snapshot -->
+  <div class="grid2">
+    <div class="card section">
+      <h3 class="section-title" style="margin-bottom:12px">Valuation & Profitability</h3>
+      <table class="kv-table">
+        <tr><td>Trailing P/E</td><td>28.01</td></tr>
+        <tr><td>Forward P/E</td><td>23.33</td></tr>
+        <tr><td>EV/EBITDA</td><td>16.86</td></tr>
+        <tr><td>Price/Book</td><td>4.47</td></tr>
+        <tr><td>Price/Sales</td><td>1.36</td></tr>
+        <tr><td>Gross Margin</td><td>+0.4%</td></tr>
+        <tr><td>Operating Margin</td><td>+0.1%</td></tr>
+        <tr><td>Net Margin</td><td>+0.0%</td></tr>
+        <tr><td>ROE</td><td>+0.2%</td></tr>
+        <tr><td>Revenue Growth</td><td>+0.0%</td></tr>
+      </table>
+    </div>
+    <div class="card section">
+      <h3 class="section-title" style="margin-bottom:12px">Financial Health</h3>
+      <table class="kv-table">
+        <tr><td>Market Cap</td><td>USD63.0B</td></tr>
+        <tr><td>Total Revenue</td><td>USD46.5B</td></tr>
+        <tr><td>EBITDA</td><td>USD3.9B</td></tr>
+        <tr><td>Free Cash Flow</td><td>USD1.3B</td></tr>
+        <tr><td>Total Debt</td><td>USD11.2B</td></tr>
+        <tr><td>Total Cash</td><td>USD8.1B</td></tr>
+        <tr><td>Debt/Equity</td><td>79.33</td></tr>
+        <tr><td>Current Ratio</td><td>2.14</td></tr>
+        <tr><td>Short % Float</td><td>+0.1%</td></tr>
+        <tr><td>Dividend Yield</td><td>+3.9%</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- Earnings history -->
+  
+
+  <!-- Insider transactions -->
+  <div class="section">
+    <div class="section-title">Insider Transactions (last 90 days)</div>
+    <div class="card">
+      <table class="data">
+        <thead><tr><th class="left">Date</th><th class="left">Name</th><th>Action</th><th>Shares</th><th>Value</th></tr></thead>
+        <tbody><tr>
+          <td>2026-05-14</td>
+          <td>PARKER MARK G</td>
+          <td class="neg">SELL</td>
+          <td>625,385</td>
+          <td>—</td>
+        </tr><tr>
+          <td>2026-04-13</td>
+          <td>Hill Elliott</td>
+          <td class="pos">BUY</td>
+          <td>265,247</td>
+          <td>—</td>
+        </tr><tr>
+          <td>2026-04-13</td>
+          <td>Hill Elliott</td>
+          <td class="pos">BUY</td>
+          <td>265,247</td>
+          <td>—</td>
+        </tr><tr>
+          <td>2026-04-10</td>
+          <td>COOK TIMOTHY D</td>
+          <td class="pos">BUY</td>
+          <td>130,480</td>
+          <td>—</td>
+        </tr><tr>
+          <td>2026-04-09</td>
+          <td>ROGERS JOHN W JR</td>
+          <td class="pos">BUY</td>
+          <td>41,022</td>
+          <td>—</td>
+        </tr><tr>
+          <td>2026-04-07</td>
+          <td>SWAN ROBERT HOLMES</td>
+          <td class="pos">BUY</td>
+          <td>55,074</td>
+          <td>—</td>
+        </tr><tr>
+          <td>2026-04-02</td>
+          <td>Knight Travis A</td>
+          <td class="neg">SELL</td>
+          <td>4,694,859</td>
+          <td>—</td>
+        </tr><tr>
+          <td>2026-04-02</td>
+          <td>Knight Travis A</td>
+          <td class="neg">SELL</td>
+          <td>4,694,859</td>
+          <td>—</td>
+        </tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Recent news -->
+  <div class="section">
+    <div class="section-title">Recent News</div>
+    <div class="card"><div class="news-item"><span class="news-date">2026-05-18</span><span class="news-source">Yahoo</span><p>Pepsi, Apple, and 9 More AI Momentum Trade Winners. Plus 4 Losers to Dump.</p></div><div class="news-item"><span class="news-date">2026-05-18</span><span class="news-source">Yahoo</span><p>Amazon Faces Consumer Lawsuit Over Tariff-Related Price Hikes</p></div><div class="news-item"><span class="news-date">2026-05-18</span><span class="news-source">Yahoo</span><p>McDonald's Tests Brand Power With Nike Tie In And Spam McMuffin</p></div><div class="news-item"><span class="news-date">2026-05-18</span><span class="news-source">Yahoo</span><p>Does Nike (NKE) Stand at an Attractive Risk Reward Setup?</p></div><div class="news-item"><span class="news-date">2026-05-18</span><span class="news-source">Yahoo</span><p>Jim Cramer Discusses Nike (NKE) & China</p></div><div class="news-item"><span class="news-date">2026-05-18</span><span class="news-source">Yahoo</span><p>Lululemon claps back at Chip Wilson after spurned settlement offer</p></div><div class="news-item"><span class="news-date">2026-05-18</span><span class="news-source">Yahoo</span><p>Lululemon pushes back in proxy battle, calls founder Chip Wilson's views 'outdated'</p></div><div class="news-item"><span class="news-date">2026-05-18</span><span class="news-source">Benzinga</span><p>Lululemon Slams Founder Over 'Outdated Perspectives' Amid Proxy Fight</p></div><div class="news-item"><span class="news-date">2026-05-18</span><span class="news-source">CNBC</span><p>Lululemon takes battle with Chip Wilson public, calls founder 'misguided' and 'outdated'</p></div><div class="news-item"><span class="news-date">2026-05-17</span><span class="news-source">Benzinga</span><p>Lululemon Stock Hits Extreme Oversold Territory as Analysts Maintain Bullish Forecasts</p></div><div class="news-item"><span class="news-date">2026-05-18</span><span class="news-source">Insider Monkey</span><p>Nike Faces Mounting Pressure in its Once-Booming China Market, WSJ Reports</p></div><div class="news-item"><span class="news-date">2026-05-18</span><span class="news-source">Footwear News</span><p>On Holding Founders Acquire $6.6 Million of Class A Shares</p></div><div class="news-item"><span class="news-date">2026-05-17</span><span class="news-source">Moneywise</span><p>Mark Cuban: 'I’ve gotten beat.' After investing 20M into his first 85 Shark Tank investments they lost money</p></div></div>
+  </div>
+
+  <!-- Full Claude analysis (collapsible) -->
+  <div class="section">
+    <details>
+      <summary style="cursor:pointer;font-size:12px;font-weight:700;text-transform:uppercase;
+        letter-spacing:.06em;color:var(--muted);padding:8px 0;border-bottom:1px solid var(--border)">
+        Full AI Analysis (click to expand)
+      </summary>
+      <div class="card" style="margin-top:12px;padding:20px">
+        <pre class="analysis-text"># Nike, Inc. (NKE) — Deep-Dive Equity Research Report
+
+**Date:** May 18, 2026
+**Current Price:** $42.57 | **Market Cap:** ~$63B | **Rating: HOLD — with caution**
+
+---
+
+## Executive Summary
+
+Nike is a once-dominant global athletic brand in the midst of a painful, multi-year operational and strategic reset. The stock is trading near 12-year lows, down ~45% from its 52-week high and nearly 30% over the past year alone. While the brand remains among the most recognized in the world, Nike is contending with stagnant revenues, collapsing earnings, intensifying competition, geopolitical headwinds in China, tariff-related legal and cost risks, and a turnaround narrative that keeps getting pushed out. The valuation, while cheaper than it was, is not yet cheap enough to compensate for the deterioration in fundamentals and the uncertainty around the recovery timeline. This is a "show me" story, not a conviction buy.
+
+---
+
+## 1. Valuation Assessment
+
+| Metric | Nike (NKE) | Sector Median | 5-Yr Avg NKE |
+|---|---|---|---|
+| Trailing P/E | 28.0x | 19.3x | 27.6x |
+| Forward P/E | 23.3x | — | — |
+| P/S | 1.36x | — | — |
+| EV/EBITDA | 16.9x | — | — |
+| P/FCF | 59.2x | — | — |
+
+**Verdict: Not cheap.** Nike trades at a significant premium to the sector on a trailing P/E basis (28x vs. 19x sector). The forward P/E of 23x implies some earnings recovery, but that recovery is not guaranteed. The P/FCF of ~59x is alarming — free cash flow has been gutted. P/S of 1.36x is the only metric that looks "reasonable," but that's a function of the revenue base holding up while margins have compressed dramatically.
+
+Critically, Nike's 5-year average P/E is ~27.6x, so at 28x trailing the stock is *not* trading at a discount to its own historical multiple despite fundamentally worse operating performance. This is not the deep value some headlines suggest.
+
+---
+
+## 2. Fundamental Analysis
+
+### Revenue & Growth
+- **Revenue (TTM):** ~$46.5B — essentially flat YoY (+0.1%)
+- **3-year revenue CAGR:** -0.29% — Nike has been shrinking on a real basis
+- The company's growth engine is broken. The DTC pivot under prior leadership cannibalized wholesale relationships without delivering enough incremental revenue. New CEO Elliott Hill is working to rebuild wholesale partnerships, but this is a multi-quarter (likely multi-year) process.
+
+### Profitability
+- **Gross Margin:** 40.9% — still healthy but down from mid-40s levels seen in recent years
+- **Operating Margin:** 6.9% — this is deeply concerning. Nike historically operated at 12-16% margins. A sub-7% operating margin signals structural cost issues, promotional activity, and/or inventory markdown pressure.
+- **Net Margin:** 4.8% — barely profitable at scale
+- **EBITDA Margin:** 8.3% — weak for a premium brand
+- **Earnings Growth YoY:** -34.8% — collapsing profitability
+- **EPS 3-year CAGR:** -16.8% — this is destruction of earnings power, not a blip
+
+### Balance Sheet
+- **Net Debt:** ~$3.1B ($11.2B total debt - $8.1B cash)
+- **D/E:** 79% — leveraged but manageable
+- **Current Ratio:** 2.14 — no near-term liquidity risk
+- **FCF:** $1.3B — down dramatically from the $5-6B+ levels Nike generated in better years
+
+The balance sheet is adequate but no longer a fortress. FCF generation has deteriorated to the point where the company's ability to buy back stock aggressively and fund innovation simultaneously is constrained.
+
+### Dividend Note
+The reported dividend yield of 392% is clearly a data error. Nike's actual annual dividend is ~$1.48/share, implying a yield of roughly 3.5% at current prices. This is historically high for Nike (usually sub-1.5%), which actually reinforces the "distressed valuation" narrative — but also raises the question of dividend sustainability if FCF continues to compress.
+
+---
+
+## 3. Competitive Landscape & Strategic Concerns
+
+Nike's competitive moat has narrowed meaningfully:
+
+- **On Running (ONON):** Founders just bought $6.6M in shares — a vote of confidence. On is taking premium running market share globally. Its co-founders are putting their money where their mouth is while Nike's founding family is *selling*.
+- **New Balance:** Continues its cultural moment, eating into Nike's lifestyle and running segments.
+- **Adidas:** Resurgent under Bjørn Gulden with the Samba/Gazelle cycle.
+- **Hoka (Deckers):** Dominant in performance running.
+- **Lululemon:** Even amid its own proxy turmoil, it holds premium athletic apparel positioning.
+
+Nike's product pipeline has been criticized as stale. The Jordan brand remains a cash cow but has been over-distributed. The return to wholesale is smart but means margin compression in the near term as Nike re-earns shelf space it voluntarily ceded.
+
+---
+
+## 4. Key Risks
+
+### Tariff & Trade Exposure
+Nike sources heavily from Vietnam, Indonesia, and China. Tariff escalation is a direct hit to COGS. A class-action lawsuit related to tariff-driven price increases adds legal and reputational risk. The political environment (per the Mark Kelly comments) puts Nike in the crosshairs of both parties.
+
+### China Deterioration
+Per the WSJ report cited in the news, Nike's "once-booming China market" is under mounting pressure. Chinese consumers are increasingly favoring domestic brands (Anta, Li-Ning). This is a structural, not cyclical, shift.
+
+### Turnaround Execution Risk
+CEO Elliott Hill has been in the seat since October 2024. The turnaround playbook (rebuild wholesale, reinvest in sport, clean up inventory) is sensible but takes time. Each quarter of flat-to-declining revenue erodes confidence. The next earnings report (June 24, 2026) projects revenue of ~$11B with EPS of just $0.12 — essentially breakeven. If this disappoints, the stock has further to fall.
+
+---
+
+## 5. Insider Activity Analysis
+
+The insider picture is **mixed but concerning**:
+
+- **Bearish signals:** Phil Knight sold 4.5M shares in February. Travis Knight sold ~9.4M shares in April. Mark Parker sold 625K shares in May. The founding family and former leadership are reducing exposure at depressed levels — this is not what you want to see.
+- **Bullish signals:** New CEO Elliott Hill bought ~530K shares in April. Board members Tim Cook, John Rogers, and Robert Swan also bought. These are meaningful insider purchases.
+
+**Net read:** Management is betting on the turnaround. The founding family is hedging or diversifying. I give slightly more weight to the Knight family sales — they know this company better than anyone, and selling at 12-year lows is a notable signal.
+
+---
+
+## 6. Analyst Consensus
+
+Consensus is lukewarm. Of 33 analysts: 10 Strong Buy, 13 Buy, 20 Hold, 2 Sell. The mean recommendation of 2.24 leans toward "Buy" but the plurality is actually Hold (20 of 45 rated opinions). No price targets are available in the data, which limits our ability to assess upside. The analyst community is clearly divided, and many are likely waiting for evidence of inflection before upgrading.
+
+---
+
+## 7. Technical Assessment
+
+The stock is trading just 1.6% above its 52-week low of $41.88 — essentially sitting on support. It's down 45% from its 52-week high, and the trend is decisively bearish. There is no evidence of a bottom forming yet; the stock is in a persistent downtrend with lower highs and lower lows. A break below $41.88 could trigger accelerated selling into the mid-to-upper $30s. There is no meaningful technical reason to buy here until the stock demonstrates it can hold a level and build a base.
+
+---
+
+## 8. The Bull and Bear Cases
+
+### Bull Case
+1. **Brand power is durable.** Nike and Jordan remain the #1 and #2 most recognized athletic brands globally. Brand equity of this magnitude has historically survived operational missteps.
+2. **New leadership is credible.** Elliott Hill is a 30-year Nike veteran who understands the business. His insider purchases signal conviction. The strategic pivot back to wholesale, sport performance, and innovation is the right playbook.
+3. **Mean reversion potential.** If Nike can return to even 10-11% operating margins (vs. current ~7%), EPS could roughly double, making the stock look very cheap on a forward basis.
+4. **Valuation has compressed.** P/S of 1.36x is as cheap as Nike has been in over a decade. For a $46B revenue business with 40%+ gross margins, there's a floor on value.
+
+### Bear Case
+1. **The competitive landscape has permanently shifted.** Nike may never regain the market share it ceded. The athletic wear market is more fragmented than ever.
+2. **China is a structural headwind**, not a temporary one. Domestic Chinese brands are gaining at Nike's expense, and geopolitical tensions add complexity.
+3. **Tariffs and cost inflation** compress margins further. Nike's Asia-centric supply chain is a liability in the current trade environment.
+4. **The turnaround keeps getting pushed out.** Every quarter of weak results erodes the multiple and invites further selling. The next EPS estimate of $0.12 suggests FY26Q4 is effectively a wasted quarter.
+5. **Knight family selling at lows** is an ominous signal from the people who know the business best.
+
+---
+
+## 9. Verdict
+
+Nike is a great brand in a tough spot. The turnaround thesis is plausible but unproven, and the stock is not yet cheap enough to compensate for the execution risk, competitive headwinds, and macro uncertainty. At 28x trailing earnings with sub-7% operating margins and collapsing FCF, this is not a deep value play — it's a hope-and-wait play. The right entry point will come when (a) operating margins inflect upward, (b) the stock bases technically, or (c) the valuation compresses to 15-18x forward earnings. We are not there yet.
+
+**Rating: HOLD** for existing holders with a long time horizon. **AVOID** for new money until there is tangible evidence of margin recovery and revenue stabilization.
+
+---</pre>
+      </div>
+    </details>
+  </div>
+
+</div><!-- /container -->
+
+<div class="footer">
+  Deep Dive generated 18 May 2026 22:58 · NKE · Not financial advice · For research purposes only
+</div>
+
+<script>
+const labels = ["2025-05-19", "2025-05-20", "2025-05-21", "2025-05-22", "2025-05-23", "2025-05-27", "2025-05-28", "2025-05-29", "2025-05-30", "2025-06-02", "2025-06-03", "2025-06-04", "2025-06-05", "2025-06-06", "2025-06-09", "2025-06-10", "2025-06-11", "2025-06-12", "2025-06-13", "2025-06-16", "2025-06-17", "2025-06-18", "2025-06-20", "2025-06-23", "2025-06-24", "2025-06-25", "2025-06-26", "2025-06-27", "2025-06-30", "2025-07-01", "2025-07-02", "2025-07-03", "2025-07-07", "2025-07-08", "2025-07-09", "2025-07-10", "2025-07-11", "2025-07-14", "2025-07-15", "2025-07-16", "2025-07-17", "2025-07-18", "2025-07-21", "2025-07-22", "2025-07-23", "2025-07-24", "2025-07-25", "2025-07-28", "2025-07-29", "2025-07-30", "2025-07-31", "2025-08-01", "2025-08-04", "2025-08-05", "2025-08-06", "2025-08-07", "2025-08-08", "2025-08-11", "2025-08-12", "2025-08-13", "2025-08-14", "2025-08-15", "2025-08-18", "2025-08-19", "2025-08-20", "2025-08-21", "2025-08-22", "2025-08-25", "2025-08-26", "2025-08-27", "2025-08-28", "2025-08-29", "2025-09-02", "2025-09-03", "2025-09-04", "2025-09-05", "2025-09-08", "2025-09-09", "2025-09-10", "2025-09-11", "2025-09-12", "2025-09-15", "2025-09-16", "2025-09-17", "2025-09-18", "2025-09-19", "2025-09-22", "2025-09-23", "2025-09-24", "2025-09-25", "2025-09-26", "2025-09-29", "2025-09-30", "2025-10-01", "2025-10-02", "2025-10-03", "2025-10-06", "2025-10-07", "2025-10-08", "2025-10-09", "2025-10-10", "2025-10-13", "2025-10-14", "2025-10-15", "2025-10-16", "2025-10-17", "2025-10-20", "2025-10-21", "2025-10-22", "2025-10-23", "2025-10-24", "2025-10-27", "2025-10-28", "2025-10-29", "2025-10-30", "2025-10-31", "2025-11-03", "2025-11-04", "2025-11-05", "2025-11-06", "2025-11-07", "2025-11-10", "2025-11-11", "2025-11-12", "2025-11-13", "2025-11-14", "2025-11-17", "2025-11-18", "2025-11-19", "2025-11-20", "2025-11-21", "2025-11-24", "2025-11-25", "2025-11-26", "2025-11-28", "2025-12-01", "2025-12-02", "2025-12-03", "2025-12-04", "2025-12-05", "2025-12-08", "2025-12-09", "2025-12-10", "2025-12-11", "2025-12-12", "2025-12-15", "2025-12-16", "2025-12-17", "2025-12-18", "2025-12-19", "2025-12-22", "2025-12-23", "2025-12-24", "2025-12-26", "2025-12-29", "2025-12-30", "2025-12-31", "2026-01-02", "2026-01-05", "2026-01-06", "2026-01-07", "2026-01-08", "2026-01-09", "2026-01-12", "2026-01-13", "2026-01-14", "2026-01-15", "2026-01-16", "2026-01-20", "2026-01-21", "2026-01-22", "2026-01-23", "2026-01-26", "2026-01-27", "2026-01-28", "2026-01-29", "2026-01-30", "2026-02-02", "2026-02-03", "2026-02-04", "2026-02-05", "2026-02-06", "2026-02-09", "2026-02-10", "2026-02-11", "2026-02-12", "2026-02-13", "2026-02-17", "2026-02-18", "2026-02-19", "2026-02-20", "2026-02-23", "2026-02-24", "2026-02-25", "2026-02-26", "2026-02-27", "2026-03-02", "2026-03-03", "2026-03-04", "2026-03-05", "2026-03-06", "2026-03-09", "2026-03-10", "2026-03-11", "2026-03-12", "2026-03-13", "2026-03-16", "2026-03-17", "2026-03-18", "2026-03-19", "2026-03-20", "2026-03-23", "2026-03-24", "2026-03-25", "2026-03-26", "2026-03-27", "2026-03-30", "2026-03-31", "2026-04-01", "2026-04-02", "2026-04-06", "2026-04-07", "2026-04-08", "2026-04-09", "2026-04-10", "2026-04-13", "2026-04-14", "2026-04-15", "2026-04-16", "2026-04-17", "2026-04-20", "2026-04-21", "2026-04-22", "2026-04-23", "2026-04-24", "2026-04-27", "2026-04-28", "2026-04-29", "2026-04-30", "2026-05-01", "2026-05-04", "2026-05-05", "2026-05-06", "2026-05-07", "2026-05-08", "2026-05-11", "2026-05-12", "2026-05-13", "2026-05-14", "2026-05-15", "2026-05-18"];
+const prices = [60.5602, 61.0284, 58.5116, 59.8188, 58.5506, 61.2918, 60.2675, 59.9358, 59.1066, 60.4618, 61.2474, 61.6402, 61.542, 61.6697, 60.7957, 62.7204, 61.9741, 61.6697, 59.4405, 60.7859, 58.9201, 58.4389, 58.7138, 59.686, 60.3145, 59.7351, 61.4143, 70.7434, 69.7614, 72.0887, 75.0151, 75.0151, 75.1525, 72.5895, 72.236, 73.2769, 71.3227, 70.9496, 70.6943, 70.8023, 71.6664, 71.1656, 72.6877, 74.0331, 75.3686, 74.0625, 74.8972, 77.8138, 76.9201, 75.2998, 73.3456, 73.2769, 73.4733, 73.0412, 74.1214, 73.0118, 72.8547, 72.6877, 73.5519, 75.8105, 75.0151, 75.5846, 76.0363, 75.4962, 74.8874, 74.8088, 76.9692, 77.745, 77.2344, 76.655, 76.5175, 75.9774, 73.332, 73.7762, 74.3783, 72.9569, 73.1938, 72.6509, 73.2925, 73.3715, 72.0586, 72.0882, 71.8118, 71.3775, 71.1702, 69.9758, 70.3608, 70.0153, 70.3016, 68.3471, 68.4162, 68.6531, 68.8308, 73.2431, 73.6084, 71.0024, 70.2522, 68.0214, 68.199, 67.1823, 64.3789, 66.5111, 66.7677, 67.5772, 65.9781, 66.5012, 66.748, 67.4784, 68.1892, 68.7814, 68.2188, 67.7055, 66.5604, 64.5073, 64.0631, 63.7571, 61.8421, 60.4404, 61.309, 61.0919, 60.3022, 60.0159, 62.3356, 63.3721, 65.1785, 63.3425, 62.0889, 61.6841, 61.8322, 60.6378, 61.9901, 61.1314, 62.8588, 63.5004, 63.7965, 64.9588, 64.5019, 65.2171, 65.2569, 65.4257, 63.121, 62.9124, 65.3562, 67.2933, 67.0251, 67.3331, 66.6774, 65.2569, 65.1973, 58.3229, 56.8427, 56.9619, 59.6044, 60.5282, 60.8064, 60.7865, 63.2899, 62.8627, 64.1045, 64.9191, 62.8031, 64.8297, 65.4853, 65.2072, 65.8628, 65.1376, 64.1641, 63.9555, 63.2104, 64.9787, 65.0284, 64.6111, 64.5615, 62.674, 61.8296, 62.1872, 61.4024, 61.77, 60.5282, 63.7966, 62.2866, 63.4985, 61.9985, 62.6243, 61.9389, 60.6971, 62.7137, 64.3926, 65.1178, 65.1774, 64.9688, 62.674, 63.6674, 62.982, 63.5283, 61.77, 61.01, 59.39, 58.64, 58.02, 57.01, 56.53, 56.08, 55.7, 54.13, 53.98, 54.79, 55.12, 53.47, 53.44, 52.37, 52.71, 53.49, 52.98, 52.07, 51.37, 51.24, 52.82, 44.63, 44.19, 44.03, 42.69, 43.13, 44.0, 42.62, 42.91, 44.2, 45.44, 45.7, 46.03, 46.48, 46.39, 45.68, 44.78, 44.69, 45.14, 45.03, 44.39, 44.36, 44.4, 43.09, 43.06, 43.88, 44.41, 44.14, 42.39, 42.35, 42.34, 42.02, 41.88, 42.57];
+const ctx = document.getElementById('priceChart').getContext('2d');
+const grad = ctx.createLinearGradient(0,0,0,260);
+grad.addColorStop(0, 'rgba(234,179,8,0.25)');
+grad.addColorStop(1, 'rgba(234,179,8,0.0)');
+new Chart(ctx, {
+  type:'line',
+  data:{
+    labels,
+    datasets:[{
+      data:prices,
+      borderColor:'#eab308',
+      backgroundColor:grad,
+      borderWidth:2,
+      pointRadius:0,
+      pointHoverRadius:4,
+      fill:true,
+      tension:0.3
+    }]
+  },
+  options:{
+    responsive:true,maintainAspectRatio:false,
+    interaction:{mode:'index',intersect:false},
+    plugins:{
+      legend:{display:false},
+      tooltip:{callbacks:{label:c=>'  USD'+c.parsed.y.toFixed(2)}}
+    },
+    scales:{
+      x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#7a82a0',font:{size:10},maxTicksLimit:12,maxRotation:0}},
+      y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#7a82a0',font:{size:10},callback:v=>'USD'+v.toFixed(0)}}
+    }
+  }
+});
+</script>
+</body>
+</html>
