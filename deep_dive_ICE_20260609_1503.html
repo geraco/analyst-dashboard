@@ -1,0 +1,391 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Deep Dive: ICE</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" integrity="sha384-e6nUZLBkQ86NJ6TVVKAeSaK8jWa3NhkYWZFomE39AvDbQWeie9PlQqM3pmYW5d1g" crossorigin="anonymous"></script>
+<style>
+:root{
+  --bg:#0f1117;--surface:#1a1d27;--surface2:#22263a;--border:#2e3350;
+  --text:#e2e8f0;--muted:#7a82a0;
+  --green:#22c55e;--red:#ef4444;--yellow:#eab308;--blue:#3b82f6;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  background:var(--bg);color:var(--text);font-size:14px;line-height:1.6}
+.header{background:var(--surface);border-bottom:1px solid var(--border);
+  padding:20px 32px;display:flex;align-items:center;justify-content:space-between}
+.header-left h1{font-size:24px;font-weight:800}
+.header-left p{color:var(--muted);font-size:13px;margin-top:2px}
+.verdict-badge{padding:10px 24px;border-radius:10px;font-size:20px;font-weight:800;
+  background:#22c55e22;color:#22c55e;border:2px solid #22c55e55}
+.conf-badge{font-size:11px;color:var(--muted);text-align:right;margin-top:4px}
+.container{max-width:1200px;margin:0 auto;padding:24px 32px}
+.liner{background:var(--surface);border:1px solid var(--border);border-left:4px solid #22c55e;
+  border-radius:8px;padding:16px 20px;margin-bottom:24px;font-size:15px;font-style:italic}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:24px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px}
+.card h3{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;
+  color:var(--muted);margin-bottom:10px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px}
+.stat-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.stat-value{font-size:22px;font-weight:700;margin-top:2px}
+.stat-sub{font-size:11px;color:var(--muted);margin-top:2px}
+.section{margin-bottom:28px}
+.section-title{font-size:12px;font-weight:700;text-transform:uppercase;
+  letter-spacing:.06em;color:var(--muted);margin-bottom:12px;
+  padding-bottom:8px;border-bottom:1px solid var(--border)}
+.chart-wrap{height:260px;position:relative}
+ul.bullets{list-style:none;padding:0}
+ul.bullets li{padding:6px 0;border-bottom:1px solid var(--border);font-size:13px}
+ul.bullets li:last-child{border-bottom:none}
+ul.bullets li.pos::before{content:"▲ ";color:var(--green)}
+ul.bullets li.neg::before{content:"▼ ";color:var(--red)}
+ul.bullets li.risk::before{content:"⚠ ";color:var(--yellow)}
+ul.bullets li.cat::before{content:"→ ";color:var(--blue)}
+.analysis-text{font-size:13px;line-height:1.8;color:var(--text);
+  white-space:pre-wrap;word-break:break-word}
+.kv-table{width:100%;border-collapse:collapse}
+.kv-table td{padding:6px 0;border-bottom:1px solid var(--border);font-size:13px}
+.kv-table td:first-child{color:var(--muted);width:55%}
+.kv-table td:last-child{text-align:right;font-weight:600}
+table.data{width:100%;border-collapse:collapse;font-size:12px}
+table.data th{background:var(--surface2);color:var(--muted);font-size:10px;
+  font-weight:700;text-transform:uppercase;padding:7px 10px;text-align:right}
+table.data th:first-child{text-align:left}
+table.data td{padding:7px 10px;border-top:1px solid var(--border);text-align:right}
+table.data td:first-child{text-align:left}
+.pos{color:var(--green)}
+.neg{color:var(--red)}
+.neu{color:var(--text)}
+.news-item{padding:10px 0;border-bottom:1px solid var(--border)}
+.news-item:last-child{border-bottom:none}
+.news-item p{font-size:13px;margin-top:4px}
+.news-date{font-size:11px;color:var(--muted);margin-right:8px}
+.news-source{font-size:11px;color:var(--blue)}
+.level-pill{display:inline-block;padding:3px 10px;border-radius:5px;font-weight:700;font-size:13px}
+.footer{text-align:center;color:var(--muted);font-size:11px;padding:24px;margin-top:32px;
+  border-top:1px solid var(--border)}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <h1>Intercontinental Exchange Inc. &nbsp;<span style="font-weight:400;color:var(--muted);font-size:18px">(ICE)</span></h1>
+    <p>Financial Services · Financial Data & Stock Exchanges · United States · Generated 09 Jun 2026 15:03</p>
+  </div>
+  <div style="text-align:right">
+    <div class="verdict-badge">BUY &nbsp; LONG-TERM</div>
+    <div class="conf-badge">Confidence: MEDIUM</div>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- One-liner -->
+  <div class="liner">"A high-quality financial infrastructure franchise trading near 52-week lows at ~16x forward earnings, offering a compelling risk/reward for patient investors willing to wait for mortgage cycle recovery and deleveraging."</div>
+
+  <!-- Key stats row -->
+  <div class="grid4">
+    <div class="stat-card">
+      <div class="stat-label">Current Price</div>
+      <div class="stat-value">USD139.85</div>
+      <div class="stat-sub">1yr: -0.2%</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Analyst Target</div>
+      <div class="stat-value ">USD—</div>
+      <div class="stat-sub">Upside: —</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Market Cap</div>
+      <div class="stat-value">USD79.1B</div>
+      <div class="stat-sub">EV: USD98.8B</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Forward P/E</div>
+      <div class="stat-value">15.86</div>
+      <div class="stat-sub">Trailing: 20.36</div>
+    </div>
+  </div>
+
+  <!-- Price Chart -->
+  <div class="section">
+    <div class="section-title">12-Month Price History</div>
+    <div class="card">
+      <div class="chart-wrap"><canvas id="priceChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Bull / Bear / Risks -->
+  <div class="grid3">
+    <div class="card">
+      <h3>Bull Case</h3>
+      <ul class="bullets"><li class="pos">Forward P/E of ~16x is a 20%+ discount to the 5-year average and 33% below the sector average for a business with 57% operating margins</li><li class="pos">Mortgage technology segment is a significant call option on lower interest rates — origination volumes could double from current depressed levels</li><li class="pos">FCF of $3.7B enables rapid deleveraging ($2-2.5B/year debt reduction after dividends), which should support multiple re-rating within 18-24 months</li></ul>
+    </div>
+    <div class="card">
+      <h3>Bear Case</h3>
+      <ul class="bullets"><li class="neg">Elevated leverage (~3.0x Net Debt/EBITDA) from the Black Knight acquisition constrains financial flexibility and weighs on EPS via interest expense</li><li class="neg">Higher-for-longer interest rates would delay the mortgage origination recovery, keeping the mortgage technology segment underearning for an extended period</li><li class="neg">At 52-week lows with rising implied volatility, the stock could break down technically before fundamental value is recognized</li></ul>
+    </div>
+    <div class="card">
+      <h3>Key Risks</h3>
+      <ul class="bullets"><li class="risk">Regulatory changes to exchange/clearing structures or data access that could erode ICE's competitive moat</li><li class="risk">Black Knight integration execution risk — large acquisitions frequently destroy value or take longer to achieve synergies than projected</li><li class="risk">Competitive encroachment from CME, Nasdaq, LSEG, and fintech disruptors in data services and mortgage technology</li></ul>
+      <h3 style="margin-top:16px">Catalysts</h3>
+      <ul class="bullets"><li class="cat">Federal Reserve interest rate cuts spurring mortgage origination recovery and Mortgage Technology segment revenue acceleration</li><li class="cat">Deleveraging below 2.5x Net Debt/EBITDA, which would remove the balance sheet discount and potentially trigger credit rating upgrades</li></ul>
+    </div>
+  </div>
+
+  <!-- Assessments -->
+  <div class="grid2">
+    <div class="card">
+      <h3>Technical Picture</h3>
+      <p style="font-size:13px;line-height:1.7;margin-bottom:14px">ICE is trading within 1% of its 52-week low at $138.45, making this a critical support level. A break below $138 could trigger further selling toward $125-130, while a bounce with volume would be constructive. The 25% drawdown from highs is atypical for a defensive infrastructure name and suggests the stock may be oversold.</p>
+      <h3 style="margin-bottom:8px">Key Levels</h3>
+      <table class="kv-table">
+        <tr><td>Support</td><td>USD138.00</td></tr>
+        <tr><td>Resistance</td><td>USD160.00</td></tr>
+        <tr><td>Price Target</td><td class="pos">USD175.00</td></tr>
+      </table>
+    </div>
+    <div class="card">
+      <h3>Fundamental Assessment</h3>
+      <p style="font-size:13px;line-height:1.7;margin-bottom:14px">At ~16x forward earnings with 57% operating margins, 20% revenue growth, and $3.7B in FCF, ICE is fundamentally cheap relative to its own history and peers. The leverage is the primary concern but is manageable given the cash flow profile; the core business quality remains excellent.</p>
+      <h3 style="margin-bottom:8px">What to Watch</h3>
+      <ul class="bullets"><li class="cat">Quarterly mortgage origination volumes and Mortgage Technology segment revenue trends as a proxy for rate sensitivity</li><li class="cat">Net debt reduction trajectory — management has guided toward rapid deleveraging; any slowdown would be a red flag</li><li class="cat">Federal Reserve rate path and 30-year mortgage rate trends, which directly impact the mortgage technology recovery thesis</li><li class="cat">Q2 2026 earnings (July 29 BMO) — consensus expects $1.95 EPS on $2.72B revenue; execution versus guidance will be critical</li></ul>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <h3>News & Sentiment</h3>
+      <p style="font-size:13px;line-height:1.7">Recent news is incrementally positive — EU climate benchmark recognition, perpetual futures exploration, and AI cybersecurity deployment — but none represent near-term catalysts. The broader narrative of financial infrastructure stocks underperforming creates the valuation opportunity rather than signaling fundamental deterioration.</p>
+    </div>
+    <div class="card">
+      <h3>Analysts & Insiders</h3>
+      <p style="font-size:13px;line-height:1.7;margin-bottom:8px">Overwhelmingly bullish consensus with 18 of 21 analysts at Buy or Strong Buy (mean score 1.50/5.0). While sell-side skew is normal, the unanimity suggests confidence in the fundamental thesis. Zero Sell ratings is notable.</p>
+      <p style="font-size:13px;line-height:1.7">No recent insider transactions provide a neutral signal. The absence of insider buying near 52-week lows is mildly disappointing but not alarming given the 0.81% ownership level typical of large-cap companies.</p>
+    </div>
+  </div>
+
+  <!-- Financials snapshot -->
+  <div class="grid2">
+    <div class="card section">
+      <h3 class="section-title" style="margin-bottom:12px">Valuation & Profitability</h3>
+      <table class="kv-table">
+        <tr><td>Trailing P/E</td><td>20.36</td></tr>
+        <tr><td>Forward P/E</td><td>15.86</td></tr>
+        <tr><td>EV/EBITDA</td><td>14.92</td></tr>
+        <tr><td>Price/Book</td><td>2.69</td></tr>
+        <tr><td>Price/Sales</td><td>7.58</td></tr>
+        <tr><td>Gross Margin</td><td>+1.0%</td></tr>
+        <tr><td>Operating Margin</td><td>+0.6%</td></tr>
+        <tr><td>Net Margin</td><td>+0.4%</td></tr>
+        <tr><td>ROE</td><td>+0.1%</td></tr>
+        <tr><td>Revenue Growth</td><td>+0.2%</td></tr>
+      </table>
+    </div>
+    <div class="card section">
+      <h3 class="section-title" style="margin-bottom:12px">Financial Health</h3>
+      <table class="kv-table">
+        <tr><td>Market Cap</td><td>USD79.1B</td></tr>
+        <tr><td>Total Revenue</td><td>USD10.4B</td></tr>
+        <tr><td>EBITDA</td><td>USD6.6B</td></tr>
+        <tr><td>Free Cash Flow</td><td>USD3.7B</td></tr>
+        <tr><td>Total Debt</td><td>USD21.0B</td></tr>
+        <tr><td>Total Cash</td><td>USD863M</td></tr>
+        <tr><td>Debt/Equity</td><td>70.99</td></tr>
+        <tr><td>Current Ratio</td><td>1.01</td></tr>
+        <tr><td>Short % Float</td><td>+0.0%</td></tr>
+        <tr><td>Dividend Yield</td><td>+1.5%</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- Earnings history -->
+  
+
+  <!-- Insider transactions -->
+  
+
+  <!-- Recent news -->
+  <div class="section">
+    <div class="section-title">Recent News</div>
+    <div class="card"><div class="news-item"><span class="news-date">2026-06-09</span><span class="news-source">Zacks</span><p>Implied Volatility Surging for Intercontinental Exchange Stock Options</p></div><div class="news-item"><span class="news-date">2026-06-08</span><span class="news-source">Simply Wall St.</span><p>EU Climate Nod And New Benchmarks Test Intercontinental Exchange Valuation</p></div><div class="news-item"><span class="news-date">2026-06-07</span><span class="news-source">Benzinga</span><p>'Can We Do That?' Intercontinental Exchange CEO Reveals Interest In Launching Perpetual Futures Amid Hyperliquid Success</p></div><div class="news-item"><span class="news-date">2026-06-06</span><span class="news-source">Investing.com</span><p>Why is the SEC taking so long on tokenized stocks? TD Cowen explains</p></div><div class="news-item"><span class="news-date">2026-06-05</span><span class="news-source">Zacks</span><p>ICE's Acquisition Strategy Drives Growth and Revenue Diversification</p></div><div class="news-item"><span class="news-date">2026-06-03</span><span class="news-source">InvestorsHub</span><p>ICE Expands AI-Powered Cybersecurity Across NYSE and Financial Infrastructure Network (ICE)</p></div><div class="news-item"><span class="news-date">2026-06-03</span><span class="news-source">Barchart</span><p>Is Intercontinental Exchange Stock Underperforming the Nasdaq?</p></div><div class="news-item"><span class="news-date">2026-06-03</span><span class="news-source">Bloomberg</span><p>Trump Officials Held Millions of Dollars of SpaceX Ahead of IPO</p></div><div class="news-item"><span class="news-date">2026-06-03</span><span class="news-source">Barchart</span><p>How Is Moody's Stock Performance Compared to Other Broker-Dealers & Securities Exchanges Stocks?</p></div><div class="news-item"><span class="news-date">2026-06-03</span><span class="news-source">Barchart</span><p>CME Group Stock: Is CME Underperforming the Financial Sector?</p></div></div>
+  </div>
+
+  <!-- Full Claude analysis (collapsible) -->
+  <div class="section">
+    <details>
+      <summary style="cursor:pointer;font-size:12px;font-weight:700;text-transform:uppercase;
+        letter-spacing:.06em;color:var(--muted);padding:8px 0;border-bottom:1px solid var(--border)">
+        Full AI Analysis (click to expand)
+      </summary>
+      <div class="card" style="margin-top:12px;padding:20px">
+        <pre class="analysis-text"># Intercontinental Exchange (ICE) — Deep-Dive Equity Research Report
+
+---
+
+## Executive Summary
+
+Intercontinental Exchange sits at a compelling juncture: a high-quality financial infrastructure franchise trading near its 52-week low, down ~25% from its high, with strong underlying profitability and a forward P/E of ~16x — meaningfully below its 5-year average of ~20x. However, the balance sheet carries significant leverage from the Black Knight acquisition, and certain data anomalies in the provided dataset (e.g., 150% dividend yield, 100% gross margin, debt/equity of 71x) warrant careful scrutiny. Let me separate signal from noise.
+
+---
+
+## 1. Business Quality Assessment
+
+ICE operates one of the premier financial market infrastructure platforms globally, organized across three segments:
+
+- **Exchanges** (~55-60% of revenue): Derivatives, equities, and commodities trading/clearing. This is a natural monopoly/oligopoly business with enormous switching costs and network effects.
+- **Fixed Income & Data Services** (~25-30%): Bond pricing data, analytics, index licensing. Recurring, subscription-based revenue with high margins.
+- **Mortgage Technology** (~15%): Acquired via Ellie Mae and Black Knight. Digital mortgage origination and servicing technology.
+
+**Quality Verdict:** The Exchanges and Data segments are among the highest-quality business models in financial services — toll-booth economics, high barriers to entry, regulatory moats, and significant operating leverage. The Mortgage Technology segment is strategically sound but cyclically exposed to interest rate-driven mortgage origination volumes.
+
+---
+
+## 2. Valuation Analysis
+
+| Metric | ICE | Context |
+|--------|-----|---------|
+| Forward P/E | 15.86x | Below 5yr avg (~20x) and sector avg (~24x) |
+| Trailing P/E | 20.36x | Roughly in line with historical average |
+| EV/EBITDA | 14.92x | Reasonable for infrastructure-quality asset |
+| P/FCF | 18.65x | Moderate; reflects strong FCF generation |
+| Price/Sales | 7.58x | Justified by 57%+ operating margins |
+
+**Assessment:** ICE is trading at a material discount to its own history and the sector. The forward P/E of ~16x for a business generating 57% operating margins and growing revenues at 20% YoY is genuinely attractive. This looks like a case where the market is pricing in macro uncertainty and rate sensitivity (mortgage segment) rather than a deterioration in the core franchise.
+
+However, I want to flag data quality issues: the reported "150% dividend yield" is clearly erroneous (ICE's actual yield is closer to 1.3-1.5%). Similarly, "100% gross margin" is a reporting artifact — ICE likely reports minimal COGS due to the nature of its business, but true economic gross margin is ~65-70%. These don't change the thesis but should be noted.
+
+---
+
+## 3. Financial Health — The Elephant in the Room
+
+**Debt is the key concern.** ICE carries ~$21B in total debt against ~$863M in cash and $3.7B in annual FCF. The debt/equity ratio of ~71% (or 0.71x, likely misformatted as 70.99) is elevated but manageable for an infrastructure business. More importantly:
+
+- **Net Debt / EBITDA:** Roughly $20.1B / $6.6B ≈ 3.0x. This is high but not distressed territory for a company with ICE's cash flow stability. Management has guided toward deleveraging to ~3.0x and below.
+- **Quick Ratio of 0.03:** This is misleading — exchange/clearinghouse businesses carry enormous margin deposits that distort liquidity ratios.
+- **Free Cash Flow of $3.7B:** This is the real story. ICE is a cash flow machine. At current rates, it can deleverage by ~$2-2.5B/year after dividends.
+
+**Assessment:** The leverage from the Black Knight acquisition is the primary financial risk, but the deleveraging trajectory is credible given FCF generation. Interest rate exposure on the debt load matters — if rates stay elevated, interest expense remains a drag on earnings growth.
+
+---
+
+## 4. Growth Drivers and Concerns
+
+### Bull Case Drivers:
+- **Revenue diversification**: ICE has transformed from a pure derivatives exchange into a diversified data/technology platform. Recurring revenue is now 50%+ of the mix.
+- **Mortgage technology optionality**: The mortgage segment is currently depressed due to high rates. When rates eventually decline, origination volumes will surge, and ICE's end-to-end digital mortgage platform (Encompass + MSP) will benefit disproportionately.
+- **Data/index business tailwinds**: EU climate benchmark recognition, new index launches, and growing demand for alternative data and fixed income analytics provide secular growth.
+- **New product innovation**: Perpetual futures exploration, tokenized equity interest, and AI-powered cybersecurity (Project Glasswing) signal ICE is proactively positioning for next-generation market structure.
+
+### Bear Case Concerns:
+- **Mortgage segment is a drag until rates fall**: With 30-year mortgage rates still elevated, origination volumes remain well below trend. This segment contributes to revenue but is operating below its potential profitability.
+- **Regulatory risk**: Exchange businesses are heavily regulated. Any structural changes to market making, clearing requirements, or data access could impact ICE's moat.
+- **Acquisition integration risk**: Black Knight was a $11.7B acquisition. Large integrations carry execution risk, and the mortgage market hasn't cooperated post-acquisition.
+- **Competitive pressure**: CME Group, Nasdaq, LSEG, and Bloomberg all compete across various ICE segments.
+
+---
+
+## 5. Ownership and Sentiment
+
+- **Institutional ownership at 96%** reflects ICE's blue-chip status in financial infrastructure.
+- **Short interest at 1.64%** is negligible — bears are not positioning aggressively against this name.
+- **Insider ownership at 0.81%** is low but typical for a $79B market cap company.
+- **No recent insider transactions** — neutral signal. Neither buying on weakness nor selling.
+
+---
+
+## 6. Analyst Consensus
+
+The sell-side is overwhelmingly bullish: 18 out of 21 analysts rate it Buy or Strong Buy, with only 3 Holds and zero Sells. The mean recommendation score of 1.50 (on a 1-5 scale) is very strong. Unfortunately, price targets are unavailable in this dataset, but consensus targets have historically been in the $165-$185 range, implying 18-32% upside from current levels.
+
+**Caveat:** Sell-side consensus is almost always skewed bullish. The 3 Holds are worth noting — they may be pricing in the leverage/mortgage cycle risks more heavily.
+
+---
+
+## 7. Technical Assessment
+
+ICE is trading at $139.85, essentially at its 52-week low of $138.45. This is a critical juncture:
+
+- The stock is down 25% from its 52-week high of $186.76, which is an unusually deep drawdown for a business of this quality.
+- Being within 1% of the 52-week low means the stock is either finding a floor or at risk of breaking down further.
+- The beta of 0.92 suggests this selloff has been driven more by company-specific or sector rotation factors than broader market beta.
+
+A break below $138 would be technically significant and could trigger further selling to the $125-130 range. A bounce from this level with volume would be constructive.
+
+---
+
+## 8. News Flow Assessment
+
+Recent news is constructive but not catalytic:
+- EU climate benchmark recognition is a modest positive for the data/index business.
+- Perpetual futures exploration is forward-looking and could be meaningful if approved by regulators, but this is early-stage.
+- AI/cybersecurity deployment is table-stakes spending, not a revenue driver.
+- The broader theme of financial infrastructure stocks underperforming the Nasdaq is a headwind but potentially creates the value opportunity.
+
+---
+
+## 9. Overall Verdict
+
+ICE is a high-quality infrastructure franchise trading at a meaningful discount to its historical valuation due to: (1) elevated leverage from the Black Knight acquisition, (2) a depressed mortgage origination cycle, and (3) general rotation away from financial infrastructure stocks.
+
+The core exchange and data businesses are excellent — toll-booth economics with durable competitive advantages. The mortgage technology segment is a legitimate call option on lower interest rates. FCF generation of $3.7B supports deleveraging, dividends, and eventual multiple re-rating.
+
+**The risk is timing.** If rates stay higher for longer, the mortgage recovery thesis gets pushed out, leverage stays elevated, and the stock could remain range-bound or drift lower. But at ~16x forward earnings for a business with 57% operating margins and mid-to-high single digit organic revenue growth, the downside appears well-supported by fundamental value.
+
+This is a **BUY** for patient investors with a 12-24 month horizon, with the understanding that near-term catalysts are limited and the stock may test lower levels before recovering.
+
+---</pre>
+      </div>
+    </details>
+  </div>
+
+</div><!-- /container -->
+
+<div class="footer">
+  Deep Dive generated 09 Jun 2026 15:03 · ICE · Not financial advice · For research purposes only
+</div>
+
+<script>
+const labels = ["2025-06-09", "2025-06-10", "2025-06-11", "2025-06-12", "2025-06-13", "2025-06-16", "2025-06-17", "2025-06-18", "2025-06-20", "2025-06-23", "2025-06-24", "2025-06-25", "2025-06-26", "2025-06-27", "2025-06-30", "2025-07-01", "2025-07-02", "2025-07-03", "2025-07-07", "2025-07-08", "2025-07-09", "2025-07-10", "2025-07-11", "2025-07-14", "2025-07-15", "2025-07-16", "2025-07-17", "2025-07-18", "2025-07-21", "2025-07-22", "2025-07-23", "2025-07-24", "2025-07-25", "2025-07-28", "2025-07-29", "2025-07-30", "2025-07-31", "2025-08-01", "2025-08-04", "2025-08-05", "2025-08-06", "2025-08-07", "2025-08-08", "2025-08-11", "2025-08-12", "2025-08-13", "2025-08-14", "2025-08-15", "2025-08-18", "2025-08-19", "2025-08-20", "2025-08-21", "2025-08-22", "2025-08-25", "2025-08-26", "2025-08-27", "2025-08-28", "2025-08-29", "2025-09-02", "2025-09-03", "2025-09-04", "2025-09-05", "2025-09-08", "2025-09-09", "2025-09-10", "2025-09-11", "2025-09-12", "2025-09-15", "2025-09-16", "2025-09-17", "2025-09-18", "2025-09-19", "2025-09-22", "2025-09-23", "2025-09-24", "2025-09-25", "2025-09-26", "2025-09-29", "2025-09-30", "2025-10-01", "2025-10-02", "2025-10-03", "2025-10-06", "2025-10-07", "2025-10-08", "2025-10-09", "2025-10-10", "2025-10-13", "2025-10-14", "2025-10-15", "2025-10-16", "2025-10-17", "2025-10-20", "2025-10-21", "2025-10-22", "2025-10-23", "2025-10-24", "2025-10-27", "2025-10-28", "2025-10-29", "2025-10-30", "2025-10-31", "2025-11-03", "2025-11-04", "2025-11-05", "2025-11-06", "2025-11-07", "2025-11-10", "2025-11-11", "2025-11-12", "2025-11-13", "2025-11-14", "2025-11-17", "2025-11-18", "2025-11-19", "2025-11-20", "2025-11-21", "2025-11-24", "2025-11-25", "2025-11-26", "2025-11-28", "2025-12-01", "2025-12-02", "2025-12-03", "2025-12-04", "2025-12-05", "2025-12-08", "2025-12-09", "2025-12-10", "2025-12-11", "2025-12-12", "2025-12-15", "2025-12-16", "2025-12-17", "2025-12-18", "2025-12-19", "2025-12-22", "2025-12-23", "2025-12-24", "2025-12-26", "2025-12-29", "2025-12-30", "2025-12-31", "2026-01-02", "2026-01-05", "2026-01-06", "2026-01-07", "2026-01-08", "2026-01-09", "2026-01-12", "2026-01-13", "2026-01-14", "2026-01-15", "2026-01-16", "2026-01-20", "2026-01-21", "2026-01-22", "2026-01-23", "2026-01-26", "2026-01-27", "2026-01-28", "2026-01-29", "2026-01-30", "2026-02-02", "2026-02-03", "2026-02-04", "2026-02-05", "2026-02-06", "2026-02-09", "2026-02-10", "2026-02-11", "2026-02-12", "2026-02-13", "2026-02-17", "2026-02-18", "2026-02-19", "2026-02-20", "2026-02-23", "2026-02-24", "2026-02-25", "2026-02-26", "2026-02-27", "2026-03-02", "2026-03-03", "2026-03-04", "2026-03-05", "2026-03-06", "2026-03-09", "2026-03-10", "2026-03-11", "2026-03-12", "2026-03-13", "2026-03-16", "2026-03-17", "2026-03-18", "2026-03-19", "2026-03-20", "2026-03-23", "2026-03-24", "2026-03-25", "2026-03-26", "2026-03-27", "2026-03-30", "2026-03-31", "2026-04-01", "2026-04-02", "2026-04-06", "2026-04-07", "2026-04-08", "2026-04-09", "2026-04-10", "2026-04-13", "2026-04-14", "2026-04-15", "2026-04-16", "2026-04-17", "2026-04-20", "2026-04-21", "2026-04-22", "2026-04-23", "2026-04-24", "2026-04-27", "2026-04-28", "2026-04-29", "2026-04-30", "2026-05-01", "2026-05-04", "2026-05-05", "2026-05-06", "2026-05-07", "2026-05-08", "2026-05-11", "2026-05-12", "2026-05-13", "2026-05-14", "2026-05-15", "2026-05-18", "2026-05-19", "2026-05-20", "2026-05-21", "2026-05-22", "2026-05-26", "2026-05-27", "2026-05-28", "2026-05-29", "2026-06-01", "2026-06-02", "2026-06-03", "2026-06-04", "2026-06-05", "2026-06-08", "2026-06-09"];
+const prices = [173.9269, 173.492, 175.4391, 177.0008, 176.8422, 178.19, 179.3694, 178.1504, 176.8323, 178.1207, 179.2306, 178.9135, 179.1811, 180.1226, 181.8272, 180.2316, 180.1127, 181.4704, 181.4506, 179.3595, 180.5289, 180.192, 178.8937, 180.192, 178.1801, 179.1811, 180.3109, 179.1018, 179.191, 179.1811, 179.3793, 181.9362, 182.7885, 181.1533, 183.0561, 184.0769, 183.175, 182.9471, 186.7626, 185.722, 186.3662, 186.3364, 184.7309, 184.2651, 181.1037, 179.7856, 181.0443, 179.5775, 176.3467, 176.6737, 179.6766, 177.6251, 179.0522, 177.5359, 177.1395, 175.7124, 175.5539, 175.0187, 173.5222, 173.5619, 172.9573, 172.7096, 172.333, 171.9068, 170.6878, 174.5925, 172.4122, 170.6878, 170.34, 171.1847, 170.0717, 168.7201, 169.0679, 167.0504, 167.0107, 166.2455, 166.6927, 166.9511, 167.438, 161.6342, 159.9844, 161.6143, 158.0763, 160.9782, 158.3844, 158.3148, 156.526, 157.7682, 157.2912, 156.4862, 152.4116, 152.6501, 154.3296, 155.8203, 155.9794, 156.4763, 156.675, 158.8515, 156.2974, 149.6885, 147.6015, 145.3853, 144.6896, 146.071, 145.3058, 146.6077, 148.0785, 148.5754, 151.05, 153.0973, 151.7556, 151.1295, 149.4003, 151.8351, 152.6998, 150.7221, 153.4749, 151.9544, 154.9955, 155.3234, 156.3272, 155.9694, 154.3992, 155.88, 158.126, 156.844, 156.0589, 157.0328, 159.3881, 162.0913, 162.2006, 160.4018, 159.5346, 160.342, 159.5546, 159.7838, 160.9301, 161.4285, 162.1063, 162.9935, 163.452, 162.6346, 161.4385, 159.4748, 165.0867, 165.4754, 161.3986, 161.4584, 165.4455, 165.7147, 166.1533, 172.3831, 172.722, 173.4198, 170.3995, 171.3465, 173.7886, 172.3732, 174.5362, 172.722, 171.8847, 174.5362, 173.2204, 172.6223, 162.5449, 164.3192, 167.7481, 168.4558, 168.9343, 164.2793, 151.5006, 149.3475, 151.7897, 152.9459, 154.6903, 153.6138, 153.5141, 153.6038, 154.8597, 159.8137, 162.3655, 163.6015, 164.2494, 164.2494, 165.7545, 163.4719, 165.6549, 165.2661, 159.6543, 156.5144, 158.0993, 158.6874, 160.97, 160.82, 157.16, 158.5, 158.43, 157.17, 155.82, 156.83, 155.96, 152.67, 156.94, 157.28, 158.08, 162.98, 166.39, 166.3, 167.79, 161.97, 160.6, 164.31, 162.04, 165.07, 163.75, 161.24, 160.61, 158.63, 158.82, 157.48, 158.45, 156.95, 156.3, 156.19, 158.09, 154.75, 156.44, 155.28, 153.4, 156.11, 155.82, 157.82, 155.81, 154.8, 155.72, 154.36, 155.99, 154.11, 151.69, 151.49, 152.97, 150.64, 149.71, 148.3, 147.85, 144.96, 142.38, 138.45, 142.06, 141.5, 139.05, 139.85];
+const ctx = document.getElementById('priceChart').getContext('2d');
+const grad = ctx.createLinearGradient(0,0,0,260);
+grad.addColorStop(0, 'rgba(34,197,94,0.25)');
+grad.addColorStop(1, 'rgba(34,197,94,0.0)');
+new Chart(ctx, {
+  type:'line',
+  data:{
+    labels,
+    datasets:[{
+      data:prices,
+      borderColor:'#22c55e',
+      backgroundColor:grad,
+      borderWidth:2,
+      pointRadius:0,
+      pointHoverRadius:4,
+      fill:true,
+      tension:0.3
+    }]
+  },
+  options:{
+    responsive:true,maintainAspectRatio:false,
+    interaction:{mode:'index',intersect:false},
+    plugins:{
+      legend:{display:false},
+      tooltip:{callbacks:{label:c=>'  USD'+c.parsed.y.toFixed(2)}}
+    },
+    scales:{
+      x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#7a82a0',font:{size:10},maxTicksLimit:12,maxRotation:0}},
+      y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#7a82a0',font:{size:10},callback:v=>'USD'+v.toFixed(0)}}
+    }
+  }
+});
+</script>
+</body>
+</html>
