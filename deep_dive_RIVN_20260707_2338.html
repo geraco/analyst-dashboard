@@ -1,0 +1,486 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8"/>
+<meta name="viewport" content="width=device-width, initial-scale=1.0"/>
+<title>Deep Dive: RIVN</title>
+<script src="https://cdn.jsdelivr.net/npm/chart.js@4.4.0/dist/chart.umd.min.js" integrity="sha384-e6nUZLBkQ86NJ6TVVKAeSaK8jWa3NhkYWZFomE39AvDbQWeie9PlQqM3pmYW5d1g" crossorigin="anonymous"></script>
+<style>
+:root{
+  --bg:#0f1117;--surface:#1a1d27;--surface2:#22263a;--border:#2e3350;
+  --text:#e2e8f0;--muted:#7a82a0;
+  --green:#22c55e;--red:#ef4444;--yellow:#eab308;--blue:#3b82f6;
+}
+*{box-sizing:border-box;margin:0;padding:0}
+body{font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,sans-serif;
+  background:var(--bg);color:var(--text);font-size:14px;line-height:1.6}
+.header{background:var(--surface);border-bottom:1px solid var(--border);
+  padding:20px 32px;display:flex;align-items:center;justify-content:space-between}
+.header-left h1{font-size:24px;font-weight:800}
+.header-left p{color:var(--muted);font-size:13px;margin-top:2px}
+.verdict-badge{padding:10px 24px;border-radius:10px;font-size:20px;font-weight:800;
+  background:#ef444422;color:#ef4444;border:2px solid #ef444455}
+.conf-badge{font-size:11px;color:var(--muted);text-align:right;margin-top:4px}
+.container{max-width:1200px;margin:0 auto;padding:24px 32px}
+.liner{background:var(--surface);border:1px solid var(--border);border-left:4px solid #ef4444;
+  border-radius:8px;padding:16px 20px;margin-bottom:24px;font-size:15px;font-style:italic}
+.grid2{display:grid;grid-template-columns:1fr 1fr;gap:16px;margin-bottom:24px}
+.grid3{display:grid;grid-template-columns:1fr 1fr 1fr;gap:16px;margin-bottom:24px}
+.grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px;margin-bottom:24px}
+.card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:16px}
+.card h3{font-size:11px;font-weight:700;text-transform:uppercase;letter-spacing:.05em;
+  color:var(--muted);margin-bottom:10px}
+.stat-card{background:var(--surface);border:1px solid var(--border);border-radius:10px;padding:14px}
+.stat-label{font-size:11px;color:var(--muted);text-transform:uppercase;letter-spacing:.04em}
+.stat-value{font-size:22px;font-weight:700;margin-top:2px}
+.stat-sub{font-size:11px;color:var(--muted);margin-top:2px}
+.section{margin-bottom:28px}
+.section-title{font-size:12px;font-weight:700;text-transform:uppercase;
+  letter-spacing:.06em;color:var(--muted);margin-bottom:12px;
+  padding-bottom:8px;border-bottom:1px solid var(--border)}
+.chart-wrap{height:260px;position:relative}
+ul.bullets{list-style:none;padding:0}
+ul.bullets li{padding:6px 0;border-bottom:1px solid var(--border);font-size:13px}
+ul.bullets li:last-child{border-bottom:none}
+ul.bullets li.pos::before{content:"▲ ";color:var(--green)}
+ul.bullets li.neg::before{content:"▼ ";color:var(--red)}
+ul.bullets li.risk::before{content:"⚠ ";color:var(--yellow)}
+ul.bullets li.cat::before{content:"→ ";color:var(--blue)}
+.analysis-text{font-size:13px;line-height:1.8;color:var(--text);
+  white-space:pre-wrap;word-break:break-word}
+.kv-table{width:100%;border-collapse:collapse}
+.kv-table td{padding:6px 0;border-bottom:1px solid var(--border);font-size:13px}
+.kv-table td:first-child{color:var(--muted);width:55%}
+.kv-table td:last-child{text-align:right;font-weight:600}
+table.data{width:100%;border-collapse:collapse;font-size:12px}
+table.data th{background:var(--surface2);color:var(--muted);font-size:10px;
+  font-weight:700;text-transform:uppercase;padding:7px 10px;text-align:right}
+table.data th:first-child{text-align:left}
+table.data td{padding:7px 10px;border-top:1px solid var(--border);text-align:right}
+table.data td:first-child{text-align:left}
+.pos{color:var(--green)}
+.neg{color:var(--red)}
+.neu{color:var(--text)}
+.news-item{padding:10px 0;border-bottom:1px solid var(--border)}
+.news-item:last-child{border-bottom:none}
+.news-item p{font-size:13px;margin-top:4px}
+.news-date{font-size:11px;color:var(--muted);margin-right:8px}
+.news-source{font-size:11px;color:var(--blue)}
+.level-pill{display:inline-block;padding:3px 10px;border-radius:5px;font-weight:700;font-size:13px}
+.footer{text-align:center;color:var(--muted);font-size:11px;padding:24px;margin-top:32px;
+  border-top:1px solid var(--border)}
+</style>
+</head>
+<body>
+
+<div class="header">
+  <div class="header-left">
+    <h1>Rivian Automotive, Inc. &nbsp;<span style="font-weight:400;color:var(--muted);font-size:18px">(RIVN)</span></h1>
+    <p>Consumer Cyclical · Auto Manufacturers · United States · Generated 07 Jul 2026 23:38</p>
+  </div>
+  <div style="text-align:right">
+    <div class="verdict-badge">AVOID &nbsp; MEDIUM-TERM</div>
+    <div class="conf-badge">Confidence: MEDIUM</div>
+  </div>
+</div>
+
+<div class="container">
+
+  <!-- One-liner -->
+  <div class="liner">"Rivian is executing better operationally but serial dilution, massive cash burn, and a premium valuation make the risk-reward unfavorable at $16.49."</div>
+
+  <!-- Key stats row -->
+  <div class="grid4">
+    <div class="stat-card">
+      <div class="stat-label">Current Price</div>
+      <div class="stat-value">USD16.49</div>
+      <div class="stat-sub">1yr: +0.5%</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Analyst Target</div>
+      <div class="stat-value ">USD—</div>
+      <div class="stat-sub">Upside: —</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Market Cap</div>
+      <div class="stat-value">USD22.1B</div>
+      <div class="stat-sub">EV: USD25.8B</div>
+    </div>
+    <div class="stat-card">
+      <div class="stat-label">Forward P/E</div>
+      <div class="stat-value">-8.70</div>
+      <div class="stat-sub">Trailing: —</div>
+    </div>
+  </div>
+
+  <!-- Price Chart -->
+  <div class="section">
+    <div class="section-title">12-Month Price History</div>
+    <div class="card">
+      <div class="chart-wrap"><canvas id="priceChart"></canvas></div>
+    </div>
+  </div>
+
+  <!-- Bull / Bear / Risks -->
+  <div class="grid3">
+    <div class="card">
+      <h3>Bull Case</h3>
+      <ul class="bullets"><li class="pos">Gross margin turned positive for the first time, signaling manufacturing cost curve improvement</li><li class="pos">R2 platform targeting ~$45K price point opens a dramatically larger addressable market in 2026-2027</li><li class="pos">Full-year delivery guidance raised to 70,000 vehicles, demonstrating improving execution and demand</li></ul>
+    </div>
+    <div class="card">
+      <h3>Bear Case</h3>
+      <ul class="bullets"><li class="neg">Serial dilution: 75M share offering announced July 6, with more likely needed given -$1.3B annual FCF burn</li><li class="neg">Valuation of 4x sales and $22B market cap is unjustifiable for a company with -64% net margins and subscale production</li><li class="neg">CEO and CFO sold significant stock in late May/early June, raising alignment concerns ahead of the equity raise</li></ul>
+    </div>
+    <div class="card">
+      <h3>Key Risks</h3>
+      <ul class="bullets"><li class="risk">Capital markets dependency: Rivian needs continued access to equity and debt markets to survive; a market downturn could be existential</li><li class="risk">Competitive intensification from legacy OEMs (Ford Lightning, GM Hummer/Equinox EV, Toyota) with superior scale and distribution</li><li class="risk">R2 execution risk: ramping a new lower-priced vehicle while still unprofitable on current products is operationally fraught</li><li class="risk">Macro sensitivity: premium EVs are highly discretionary purchases vulnerable to recession</li><li class="risk">Debt burden of $5.2B with no operating income to service it</li></ul>
+      <h3 style="margin-top:16px">Catalysts</h3>
+      <ul class="bullets"><li class="cat">R2 production start and initial delivery ramp — would validate the next growth leg</li><li class="cat">Sustained gross margin improvement toward 10%+ on R1 platform, demonstrating path to profitability</li></ul>
+    </div>
+  </div>
+
+  <!-- Assessments -->
+  <div class="grid2">
+    <div class="card">
+      <h3>Technical Picture</h3>
+      <p style="font-size:13px;line-height:1.7;margin-bottom:14px">Stock is trading in the middle of its 52-week range at $16.49, roughly 26% below highs and 42% above lows. The 75M share offering will likely create near-term selling pressure and resistance around $18-20. Beta of 1.60 confirms high volatility; support likely in the $14-15 zone.</p>
+      <h3 style="margin-bottom:8px">Key Levels</h3>
+      <table class="kv-table">
+        <tr><td>Support</td><td>USD14.00</td></tr>
+        <tr><td>Resistance</td><td>USD18.50</td></tr>
+        <tr><td>Price Target</td><td class="pos">USD13.50</td></tr>
+      </table>
+    </div>
+    <div class="card">
+      <h3>Fundamental Assessment</h3>
+      <p style="font-size:13px;line-height:1.7;margin-bottom:14px">Fundamentals are poor but improving directionally. The barely positive 1% gross margin is a milestone, but -64% net margins, -$1.3B FCF, and $5.2B in debt mean the company is far from self-sustaining. At 4x P/S and 4.7x P/B, the stock is priced for a future that may take years to materialize and requires significant further dilution to reach.</p>
+      <h3 style="margin-bottom:8px">What to Watch</h3>
+      <ul class="bullets"><li class="cat">Q2 2026 earnings (July 30): gross margin trajectory and commentary on R2 production timeline</li><li class="cat">Post-offering share price stabilization — how quickly the market absorbs 75M new shares</li><li class="cat">Cash burn rate trend: any improvement from -$1.3B annual FCF would be a meaningful positive signal</li><li class="cat">R2 production milestones and any updates on the Georgia plant buildout</li><li class="cat">Competitive pricing dynamics in the electric truck/SUV segment from Ford, GM, and others</li></ul>
+    </div>
+  </div>
+
+  <div class="grid2">
+    <div class="card">
+      <h3>News & Sentiment</h3>
+      <p style="font-size:13px;line-height:1.7">The dominant news is the 75M share offering (~$1.5-1.7B raise), which is tanking the stock and signals ongoing capital dependency. On the positive side, Q2 deliveries beat expectations and full-year guidance was raised to 70K vehicles. Elevated gas prices from Middle East tensions are a near-term EV tailwind but unreliable.</p>
+    </div>
+    <div class="card">
+      <h3>Analysts & Insiders</h3>
+      <p style="font-size:13px;line-height:1.7;margin-bottom:8px">Consensus is lukewarm at 2.58 (HOLD), with 19 buy-side ratings offset by 5 sell-side ratings and 10 holds. The 15-20% sell/strong-sell contingent is notable and reflects genuine disagreement about Rivian's viability at current valuation.</p>
+      <p style="font-size:13px;line-height:1.7">Mixed to negative: CEO Scaringe sold 922K shares and CFO McDonough sold ~1.77M shares in late May/early June, while several board members made smaller purchases on June 22. The large C-suite sales ahead of a dilutive offering are a concern.</p>
+    </div>
+  </div>
+
+  <!-- Financials snapshot -->
+  <div class="grid2">
+    <div class="card section">
+      <h3 class="section-title" style="margin-bottom:12px">Valuation & Profitability</h3>
+      <table class="kv-table">
+        <tr><td>Trailing P/E</td><td>—</td></tr>
+        <tr><td>Forward P/E</td><td>-8.70</td></tr>
+        <tr><td>EV/EBITDA</td><td>-8.51</td></tr>
+        <tr><td>Price/Book</td><td>4.72</td></tr>
+        <tr><td>Price/Sales</td><td>4.01</td></tr>
+        <tr><td>Gross Margin</td><td>+0.0%</td></tr>
+        <tr><td>Operating Margin</td><td>-0.6%</td></tr>
+        <tr><td>Net Margin</td><td>-0.6%</td></tr>
+        <tr><td>ROE</td><td>-0.7%</td></tr>
+        <tr><td>Revenue Growth</td><td>+0.1%</td></tr>
+      </table>
+    </div>
+    <div class="card section">
+      <h3 class="section-title" style="margin-bottom:12px">Financial Health</h3>
+      <table class="kv-table">
+        <tr><td>Market Cap</td><td>USD22.1B</td></tr>
+        <tr><td>Total Revenue</td><td>USD5.5B</td></tr>
+        <tr><td>EBITDA</td><td>USD-3.0B</td></tr>
+        <tr><td>Free Cash Flow</td><td>USD-1.3B</td></tr>
+        <tr><td>Total Debt</td><td>USD5.2B</td></tr>
+        <tr><td>Total Cash</td><td>USD4.8B</td></tr>
+        <tr><td>Debt/Equity</td><td>118.15</td></tr>
+        <tr><td>Current Ratio</td><td>2.10</td></tr>
+        <tr><td>Short % Float</td><td>+0.1%</td></tr>
+        <tr><td>Dividend Yield</td><td>—</td></tr>
+      </table>
+    </div>
+  </div>
+
+  <!-- Earnings history -->
+  
+
+  <!-- Insider transactions -->
+  <div class="section">
+    <div class="section-title">Insider Transactions (last 90 days)</div>
+    <div class="card">
+      <table class="data">
+        <thead><tr><th class="left">Date</th><th class="left">Name</th><th>Action</th><th>Shares</th><th>Value</th></tr></thead>
+        <tbody><tr>
+          <td>2026-06-22</td>
+          <td>Gomez Aidan N.</td>
+          <td class="pos">BUY</td>
+          <td>62,751</td>
+          <td>—</td>
+        </tr><tr>
+          <td>2026-06-22</td>
+          <td>Schwartz Sanford Harold</td>
+          <td class="pos">BUY</td>
+          <td>211,810</td>
+          <td>—</td>
+        </tr><tr>
+          <td>2026-06-22</td>
+          <td>Krawiec Peter</td>
+          <td class="pos">BUY</td>
+          <td>26,674</td>
+          <td>—</td>
+        </tr><tr>
+          <td>2026-06-22</td>
+          <td>Krafcik John</td>
+          <td class="pos">BUY</td>
+          <td>78,201</td>
+          <td>—</td>
+        </tr><tr>
+          <td>2026-06-22</td>
+          <td>Boone Karen</td>
+          <td class="pos">BUY</td>
+          <td>115,794</td>
+          <td>—</td>
+        </tr><tr>
+          <td>2026-06-22</td>
+          <td>FLATLEY JAY T</td>
+          <td class="pos">BUY</td>
+          <td>179,515</td>
+          <td>—</td>
+        </tr><tr>
+          <td>2026-06-18</td>
+          <td>Gomez Aidan N.</td>
+          <td class="neg">SELL</td>
+          <td>45,306</td>
+          <td>—</td>
+        </tr><tr>
+          <td>2026-06-03</td>
+          <td>McDonough Claire</td>
+          <td class="neg">SELL</td>
+          <td>878,985</td>
+          <td>—</td>
+        </tr></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- Recent news -->
+  <div class="section">
+    <div class="section-title">Recent News</div>
+    <div class="card"><div class="news-item"><span class="news-date">2026-07-07</span><span class="news-source">Benzinga</span><p>10 Consumer Discretionary Stocks With Whale Alerts In Today’s Session</p></div><div class="news-item"><span class="news-date">2026-07-07</span><span class="news-source">Benzinga</span><p>Chip Rout Drags Nasdaq 100 Lower, Oil Climbs: Stock Market Today</p></div><div class="news-item"><span class="news-date">2026-07-07</span><span class="news-source">Benzinga</span><p>Crude Oil Moves Higher; Rivian Automotive Shares Plunge</p></div><div class="news-item"><span class="news-date">2026-07-07</span><span class="news-source">Benzinga</span><p>11 Consumer Discretionary Stocks Moving In Tuesday's Intraday Session</p></div><div class="news-item"><span class="news-date">2026-07-07</span><span class="news-source">Benzinga</span><p>Stock Market Today: Dow Jones Futures Gain, S&P 500, Nasdaq 100 Slips As SpaceX Debuts On The Exchange—Rivian, Micron In Focus (UPDATED)</p></div><div class="news-item"><span class="news-date">2026-07-07</span><span class="news-source">ChartMill</span><p>Chips Get Their Confidence Back, the Dow Cracks 53,000, and Trump Moonlights as a Dell Salesman</p></div><div class="news-item"><span class="news-date">2026-07-07</span><span class="news-source">Benzinga</span><p>Rivian, Micron And Other Big Stocks Moving Lower In Tuesday’s Pre-Market Session</p></div><div class="news-item"><span class="news-date">2026-07-07</span><span class="news-source">Benzinga</span><p>Market-Moving News for July 7th</p></div><div class="news-item"><span class="news-date">2026-07-07</span><span class="news-source">Benzinga</span><p>Rivian Automotive Wants To Raise Roughly $1.7 Billion via Stock Sale</p></div><div class="news-item"><span class="news-date">2026-07-07</span><span class="news-source">Benzinga</span><p>Why Crinetics Pharmaceuticals Shares Are Trading Higher By 99%; Here Are 20 Stocks Moving Premarket</p></div><div class="news-item"><span class="news-date">2026-07-07</span><span class="news-source">Yahoo Finance</span><p>Rivian stock down on 75 million share sale, preannounces Q2 revenue</p></div><div class="news-item"><span class="news-date">2026-07-07</span><span class="news-source">Motley Fool</span><p>Rivian Is Raising Around $1.5 Billion By Offering 75 Million Shares. Here’s Why the Stock Is Tanking.</p></div><div class="news-item"><span class="news-date">2026-07-07</span><span class="news-source">Investor's Business Daily</span><p>Stock Market Today: Nasdaq Is Day's Biggest Loser; Sandisk, Micron Tumble, Eli Lilly Shines</p></div><div class="news-item"><span class="news-date">2026-07-07</span><span class="news-source">Barrons.com</span><p>Rivian Needs Cash to Grow. Its Solution Is Tanking the Stock.</p></div><div class="news-item"><span class="news-date">2026-07-07</span><span class="news-source">The Wall Street Journal</span><p>Stocks to Watch: Samsung, SpaceX, Fiserv, Rivian</p></div><div class="news-item"><span class="news-date">2026-07-07</span><span class="news-source">GuruFocus.com</span><p>Rivian's Revenue Beat Is Buried Under a Dilution Warning</p></div><div class="news-item"><span class="news-date">2026-07-07</span><span class="news-source">MT Newswires</span><p>Sector Update: Consumer Stocks Mixed Late Afternoon</p></div><div class="news-item"><span class="news-date">2026-07-07</span><span class="news-source">StockStory</span><p>Why Rivian (RIVN) Stock Is Trading Lower Today</p></div><div class="news-item"><span class="news-date">2026-07-07</span><span class="news-source">MT Newswires</span><p>Sector Update: Consumer Stocks Mixed in Afternoon Trading</p></div><div class="news-item"><span class="news-date">2026-07-07</span><span class="news-source">GuruFocus.com</span><p>Why Rivian Stock Is Plunging Today</p></div></div>
+  </div>
+
+  <!-- Full Claude analysis (collapsible) -->
+  <div class="section">
+    <details>
+      <summary style="cursor:pointer;font-size:12px;font-weight:700;text-transform:uppercase;
+        letter-spacing:.06em;color:var(--muted);padding:8px 0;border-bottom:1px solid var(--border)">
+        Full AI Analysis (click to expand)
+      </summary>
+      <div class="card" style="margin-top:12px;padding:20px">
+        <pre class="analysis-text"># Rivian Automotive, Inc. (RIVN) — Deep-Dive Equity Research Report
+
+**Date:** July 7, 2026
+**Current Price:** $16.49 | **Market Cap:** ~$22.1B | **Rating:** HOLD / AVOID
+
+---
+
+## Executive Summary
+
+Rivian remains one of the most compelling yet treacherous stories in the EV space. The company has demonstrated meaningful progress on delivery volumes — raising its full-year outlook to 70,000 vehicles after a Q2 delivery beat — and has finally clawed its way to a barely positive gross margin (1.03%). However, the company continues to burn enormous amounts of cash (&gt;$1.3B negative FCF), operates at a deeply negative -64% net margin, and just announced a highly dilutive 75-million-share offering that will raise ~$1.5-1.7B. The stock is getting punished for it, and rightfully so. This is a company that is still years away from self-sustaining profitability, competing in an increasingly crowded EV market, and asking shareholders to repeatedly fund its growth. The risk-reward is not favorable at current levels.
+
+---
+
+## 1. Business & Strategic Assessment
+
+Rivian produces the R1T pickup and R1S SUV — both well-reviewed, category-defining products in the premium electric vehicle segment. The company also has a commercial van partnership with Amazon and is developing its next-generation R2 platform targeting a lower price point. The Software and Services segment (Autonomy+, vehicle repair, subscriptions) is nascent but strategically important for long-term margin expansion.
+
+**Strengths:**
+- Strong brand positioning in the adventure/outdoor lifestyle niche
+- High insider ownership (37.56%) suggests alignment of interests
+- R1 platform refresh and upcoming R2 platform provide growth runway
+- Raised full-year delivery guidance to 70,000 vehicles — evidence of execution improvement
+- Gross margin turning positive (1.03%) is a critical milestone, though barely
+
+**Weaknesses:**
+- Still massively unprofitable: -64% net margin, -66% ROE
+- Heavy capital intensity with no clear path to FCF breakeven in the near term
+- Limited scale: ~70K vehicles/year vs. Tesla's millions and legacy OEMs ramping EV production
+- Dependence on external capital raises — this is the third or fourth time Rivian has tapped equity markets
+
+---
+
+## 2. Financial Analysis
+
+### Revenue & Growth
+Revenue TTM of ~$5.5B with 11.4% YoY growth represents a deceleration from the 48% 3-year CAGR. Q2 2026 revenue is pre-announced at $1.55B-$1.65B, which implies sequential improvement. But the growth rate is modest for a company valued at 4x revenue.
+
+### Profitability
+The barely positive gross margin (1.03%) is a turning point but remains fragile. One supply chain hiccup, pricing pressure, or production inefficiency could push it back negative. Operating margin at -64% tells us that SG&A and R&D costs are enormous relative to revenue. The company is spending roughly $3.5B more than it earns on an operating basis. This is not a profitable business and won't be for years.
+
+### Cash & Liquidity
+- Cash: $4.8B
+- Debt: $5.2B → Net debt of ~$400M
+- Free Cash Flow: -$1.3B annually
+- Current ratio of 2.10 is adequate short-term
+
+At current burn rates, Rivian's $4.8B cash pile gives it roughly 3-4 years of runway before this latest raise. The 75M share offering at ~$20-22/share (pre-announcement price) would add ~$1.5-1.7B, extending that runway. But this is the fundamental problem: **Rivian is a serial capital consumer.** Every time the stock rallies, management taps equity markets. This creates a natural ceiling on the stock price and is deeply dilutive to existing shareholders.
+
+### Balance Sheet Risk
+Debt/Equity at 118% is elevated for a pre-profit company. The combination of $5.2B in debt and continued cash burn is a significant risk factor, particularly if capital markets become less accommodating.
+
+---
+
+## 3. Valuation
+
+| Metric | RIVN | Comment |
+|--------|------|---------|
+| P/S | 4.01x | Expensive for a money-losing automaker |
+| EV/Revenue | 4.67x | Premium relative to legacy auto (0.3-1.0x) |
+| P/B | 4.72x | High given negative returns on equity |
+| Forward P/E | -8.7x | Meaningless — no profits expected |
+
+Rivian trades at a significant premium to traditional automakers and even to some EV peers. This premium is only justifiable if you believe the company will (a) scale to hundreds of thousands of units, (b) achieve gross margins of 20%+ on the R2 platform, and (c) survive long enough to get there without catastrophic dilution. All three are uncertain.
+
+**Compared to:**
+- Ford (F): ~0.3x P/S, profitable
+- GM: ~0.3x P/S, profitable
+- Tesla (TSLA): ~8-10x P/S, but massively profitable and scaled
+- Lucid (LCID): ~4-5x P/S, also unprofitable
+
+Rivian's valuation implies a future that looks like Tesla's, but the company is nowhere near that trajectory in terms of profitability or scale.
+
+---
+
+## 4. News & Catalyst Assessment
+
+The dominant news is the **75 million share public offering**, which is crushing the stock on July 7th. This offering:
+- Dilutes existing shareholders by approximately 5-6%
+- Signals that management does not believe internal cash generation can fund operations
+- Creates downward pressure as the market absorbs new supply
+
+On the positive side, Rivian **beat Q2 delivery expectations and raised its full-year guidance to 70,000 vehicles.** Q2 revenue guidance of $1.55B-$1.65B vs. consensus of ~$1.48B is encouraging. However, the market is clearly more focused on the dilution story today.
+
+Broader macro context: EV demand is benefiting from elevated gas prices (linked to Iran/Strait of Hormuz tensions), but this is a volatile and unreliable tailwind.
+
+---
+
+## 5. Insider Activity
+
+The insider picture is mixed:
+- **CEO Robert Scaringe sold 922K shares on May 28** — a significant disposal
+- **CFO Claire McDonough sold ~1.77M shares over two transactions in late May/early June**
+- Several board members bought shares on June 22, but these appear to be **smaller, potentially formulaic or RSU-related purchases**
+
+The large insider sales by the CEO and CFO are a yellow flag. While they may be pre-planned (10b5-1), the timing and size are notable. When the two most important executives are net sellers, investors should take note.
+
+---
+
+## 6. Analyst Consensus
+
+- 26 analysts: 5 Strong Buy, 14 Buy, 10 Hold, 4 Sell, 1 Strong Sell
+- Mean recommendation: 2.58 (HOLD territory)
+- No price target data available
+
+The consensus is lukewarm. The distribution is notably spread — nearly 20% of analysts have a Sell or Strong Sell rating, which is unusual for a stock with this level of institutional following. This suggests genuine disagreement about Rivian's prospects.
+
+---
+
+## 7. Technical Assessment
+
+The stock sits at $16.49, roughly 26.5% below its 52-week high of $22.45 and 42% above its 52-week low of $11.64. The 1-year return of 25.6% was driven by the delivery ramp and gross margin inflection. However, the share offering is likely to create a new near-term resistance level around $18-20. Support appears to be in the $14-15 range (prior consolidation zone). The beta of 1.60 confirms this is a high-volatility name that will amplify market moves.
+
+---
+
+## 8. Risk Assessment
+
+1. **Dilution risk:** This is the most immediate and tangible risk. At -$1.3B FCF, Rivian will need to raise capital again — likely multiple times — before reaching breakeven. Each raise erodes per-share value.
+
+2. **Competitive risk:** The EV market is becoming saturated. Legacy OEMs (Ford, GM, Hyundai, Toyota) are aggressively entering the electric truck/SUV space with more resources and established dealer networks.
+
+3. **Execution risk on R2:** The R2 platform is critical to Rivian's long-term thesis, but ramping a new, lower-priced vehicle while still losing money on current products is extraordinarily difficult.
+
+4. **Macro/demand risk:** Consumer discretionary spending is cyclically sensitive. A recession would devastate demand for $70K+ electric trucks.
+
+5. **Debt risk:** $5.2B in debt with negative cash flow and no clear path to interest coverage from operations.
+
+---
+
+## 9. Bull vs. Bear Case
+
+### Bull Case
+- Gross margin inflection is real and could accelerate as production scales and material costs decline
+- R2 platform (expected 2026-2027) opens a much larger addressable market at ~$45K price point
+- Amazon commercial van partnership provides a steady revenue floor
+- Strong brand loyalty and best-in-class product reviews
+- VW/Rivian joint venture on electrical architecture could generate licensing revenue
+
+### Bear Case
+- Company is years from FCF breakeven and will require further dilutive capital raises
+- Current valuation of 4x sales for a money-losing automaker is unjustifiable on fundamentals
+- CEO and CFO are selling stock while asking public markets for more capital
+- Competition is intensifying from better-capitalized incumbents
+- Manufacturing scale remains subscale — 70K units does not support a $22B market cap
+
+---
+
+## 10. Verdict
+
+Rivian is a real company with a real product that real customers love. That is not in dispute. What is in dispute is whether the stock at $16.49 — a $22B market cap for a company burning $1.3B/year in cash, carrying $5.2B in debt, and requiring repeated dilutive raises — represents good value for investors.
+
+The answer, in my judgment, is **no, not yet.** The gross margin inflection is a positive signal, but 1% gross margin on a -64% net margin business is the very beginning of a very long journey. The R2 platform is the real potential game-changer, but it hasn't been produced yet and carries its own execution risks. Meanwhile, the serial dilution is a fundamental structural problem that caps upside for existing shareholders.
+
+**For risk-tolerant, long-horizon investors who believe in the R2 thesis, a position at $13-14 (closer to the 52-week low) would offer a more favorable risk-reward.** At current levels, the stock is fairly priced for the known positives and doesn't adequately compensate for the considerable risks.
+
+---</pre>
+      </div>
+    </details>
+  </div>
+
+</div><!-- /container -->
+
+<div class="footer">
+  Deep Dive generated 07 Jul 2026 23:38 · RIVN · Not financial advice · For research purposes only
+</div>
+
+<script>
+const labels = ["2025-07-08", "2025-07-09", "2025-07-10", "2025-07-11", "2025-07-14", "2025-07-15", "2025-07-16", "2025-07-17", "2025-07-18", "2025-07-21", "2025-07-22", "2025-07-23", "2025-07-24", "2025-07-25", "2025-07-28", "2025-07-29", "2025-07-30", "2025-07-31", "2025-08-01", "2025-08-04", "2025-08-05", "2025-08-06", "2025-08-07", "2025-08-08", "2025-08-11", "2025-08-12", "2025-08-13", "2025-08-14", "2025-08-15", "2025-08-18", "2025-08-19", "2025-08-20", "2025-08-21", "2025-08-22", "2025-08-25", "2025-08-26", "2025-08-27", "2025-08-28", "2025-08-29", "2025-09-02", "2025-09-03", "2025-09-04", "2025-09-05", "2025-09-08", "2025-09-09", "2025-09-10", "2025-09-11", "2025-09-12", "2025-09-15", "2025-09-16", "2025-09-17", "2025-09-18", "2025-09-19", "2025-09-22", "2025-09-23", "2025-09-24", "2025-09-25", "2025-09-26", "2025-09-29", "2025-09-30", "2025-10-01", "2025-10-02", "2025-10-03", "2025-10-06", "2025-10-07", "2025-10-08", "2025-10-09", "2025-10-10", "2025-10-13", "2025-10-14", "2025-10-15", "2025-10-16", "2025-10-17", "2025-10-20", "2025-10-21", "2025-10-22", "2025-10-23", "2025-10-24", "2025-10-27", "2025-10-28", "2025-10-29", "2025-10-30", "2025-10-31", "2025-11-03", "2025-11-04", "2025-11-05", "2025-11-06", "2025-11-07", "2025-11-10", "2025-11-11", "2025-11-12", "2025-11-13", "2025-11-14", "2025-11-17", "2025-11-18", "2025-11-19", "2025-11-20", "2025-11-21", "2025-11-24", "2025-11-25", "2025-11-26", "2025-11-28", "2025-12-01", "2025-12-02", "2025-12-03", "2025-12-04", "2025-12-05", "2025-12-08", "2025-12-09", "2025-12-10", "2025-12-11", "2025-12-12", "2025-12-15", "2025-12-16", "2025-12-17", "2025-12-18", "2025-12-19", "2025-12-22", "2025-12-23", "2025-12-24", "2025-12-26", "2025-12-29", "2025-12-30", "2025-12-31", "2026-01-02", "2026-01-05", "2026-01-06", "2026-01-07", "2026-01-08", "2026-01-09", "2026-01-12", "2026-01-13", "2026-01-14", "2026-01-15", "2026-01-16", "2026-01-20", "2026-01-21", "2026-01-22", "2026-01-23", "2026-01-26", "2026-01-27", "2026-01-28", "2026-01-29", "2026-01-30", "2026-02-02", "2026-02-03", "2026-02-04", "2026-02-05", "2026-02-06", "2026-02-09", "2026-02-10", "2026-02-11", "2026-02-12", "2026-02-13", "2026-02-17", "2026-02-18", "2026-02-19", "2026-02-20", "2026-02-23", "2026-02-24", "2026-02-25", "2026-02-26", "2026-02-27", "2026-03-02", "2026-03-03", "2026-03-04", "2026-03-05", "2026-03-06", "2026-03-09", "2026-03-10", "2026-03-11", "2026-03-12", "2026-03-13", "2026-03-16", "2026-03-17", "2026-03-18", "2026-03-19", "2026-03-20", "2026-03-23", "2026-03-24", "2026-03-25", "2026-03-26", "2026-03-27", "2026-03-30", "2026-03-31", "2026-04-01", "2026-04-02", "2026-04-06", "2026-04-07", "2026-04-08", "2026-04-09", "2026-04-10", "2026-04-13", "2026-04-14", "2026-04-15", "2026-04-16", "2026-04-17", "2026-04-20", "2026-04-21", "2026-04-22", "2026-04-23", "2026-04-24", "2026-04-27", "2026-04-28", "2026-04-29", "2026-04-30", "2026-05-01", "2026-05-04", "2026-05-05", "2026-05-06", "2026-05-07", "2026-05-08", "2026-05-11", "2026-05-12", "2026-05-13", "2026-05-14", "2026-05-15", "2026-05-18", "2026-05-19", "2026-05-20", "2026-05-21", "2026-05-22", "2026-05-26", "2026-05-27", "2026-05-28", "2026-05-29", "2026-06-01", "2026-06-02", "2026-06-03", "2026-06-04", "2026-06-05", "2026-06-08", "2026-06-09", "2026-06-10", "2026-06-11", "2026-06-12", "2026-06-15", "2026-06-16", "2026-06-17", "2026-06-18", "2026-06-22", "2026-06-23", "2026-06-24", "2026-06-25", "2026-06-26", "2026-06-29", "2026-06-30", "2026-07-01", "2026-07-02", "2026-07-06", "2026-07-07"];
+const prices = [13.13, 13.2, 13.32, 13.03, 12.75, 12.63, 12.39, 12.9, 13.7, 13.7, 14.12, 14.02, 13.82, 14.01, 13.78, 13.06, 13.03, 12.87, 12.38, 12.41, 12.15, 11.64, 12.07, 11.79, 11.93, 11.97, 12.28, 12.06, 12.24, 12.41, 12.25, 12.07, 12.12, 13.09, 13.11, 13.21, 13.22, 13.64, 13.57, 13.87, 14.44, 13.7, 14.21, 13.99, 13.94, 13.91, 13.97, 13.46, 13.6, 14.32, 14.11, 14.68, 14.38, 15.24, 15.53, 15.79, 15.74, 15.59, 15.25, 14.68, 14.61, 13.53, 13.65, 13.5, 13.26, 13.13, 13.09, 12.8, 13.06, 13.12, 13.41, 12.91, 13.03, 13.08, 13.2, 12.92, 13.09, 12.98, 13.41, 13.5, 13.71, 12.99, 13.57, 13.19, 12.5, 15.42, 15.22, 15.23, 16.41, 18.02, 17.52, 16.39, 15.11, 14.87, 14.99, 14.72, 14.66, 14.86, 15.17, 15.56, 16.18, 16.86, 17.16, 17.23, 17.53, 18.06, 17.95, 17.61, 17.71, 17.5, 16.43, 18.42, 18.7, 17.9, 17.63, 20.28, 22.45, 21.75, 21.18, 21.13, 20.9, 20.67, 19.59, 19.71, 19.41, 19.59, 19.53, 20.06, 19.89, 19.22, 19.15, 18.85, 17.5, 17.06, 16.67, 16.16, 16.47, 16.32, 15.95, 15.75, 15.27, 15.2, 15.17, 14.75, 14.44, 14.41, 14.37, 13.73, 14.8, 14.69, 14.96, 14.76, 14.0, 17.73, 16.47, 16.15, 15.59, 15.27, 14.96, 15.12, 15.25, 15.61, 15.33, 15.01, 15.1, 14.92, 15.19, 15.37, 15.87, 16.54, 16.65, 15.3, 14.86, 15.33, 15.82, 15.53, 16.12, 14.91, 15.77, 16.1, 15.62, 15.21, 14.77, 14.49, 15.05, 14.94, 15.4, 15.29, 14.69, 15.14, 15.24, 15.43, 15.9, 15.99, 16.41, 16.89, 17.23, 16.92, 17.15, 17.74, 16.95, 16.52, 16.72, 16.14, 16.06, 16.4, 15.02, 14.51, 14.6, 14.48, 14.18, 14.22, 14.08, 13.95, 14.27, 14.52, 13.79, 13.35, 12.9, 13.73, 14.15, 14.22, 14.39, 14.7, 15.2, 16.3, 16.95, 17.29, 18.27, 18.12, 16.35, 16.84, 15.73, 14.76, 15.54, 16.76, 16.68, 15.93, 16.26, 16.52, 15.1, 14.89, 14.64, 14.86, 15.63, 16.81, 17.35, 17.18, 18.63, 20.14, 16.49];
+const ctx = document.getElementById('priceChart').getContext('2d');
+const grad = ctx.createLinearGradient(0,0,0,260);
+grad.addColorStop(0, 'rgba(239,68,68,0.25)');
+grad.addColorStop(1, 'rgba(239,68,68,0.0)');
+new Chart(ctx, {
+  type:'line',
+  data:{
+    labels,
+    datasets:[{
+      data:prices,
+      borderColor:'#ef4444',
+      backgroundColor:grad,
+      borderWidth:2,
+      pointRadius:0,
+      pointHoverRadius:4,
+      fill:true,
+      tension:0.3
+    }]
+  },
+  options:{
+    responsive:true,maintainAspectRatio:false,
+    interaction:{mode:'index',intersect:false},
+    plugins:{
+      legend:{display:false},
+      tooltip:{callbacks:{label:c=>'  USD'+c.parsed.y.toFixed(2)}}
+    },
+    scales:{
+      x:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#7a82a0',font:{size:10},maxTicksLimit:12,maxRotation:0}},
+      y:{grid:{color:'rgba(255,255,255,0.04)'},ticks:{color:'#7a82a0',font:{size:10},callback:v=>'USD'+v.toFixed(0)}}
+    }
+  }
+});
+</script>
+</body>
+</html>
